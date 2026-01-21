@@ -23,7 +23,7 @@ export const Layout: React.FC<
   }, []);
 
   return (
-    <div className="min-h-screen w-full bg-neutral-50 dark:bg-neutral-950">
+    <div className="min-h-screen w-full bg-white">
       <Header ref={headerRef} />
       <main
         style={{ paddingTop: disableHeaderHeight ? 0 : headerHeight }}

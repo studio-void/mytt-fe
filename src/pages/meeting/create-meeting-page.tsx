@@ -1,0 +1,177 @@
+import { useState } from 'react';
+
+import { useNavigate } from '@tanstack/react-router';
+import { toast } from 'sonner';
+
+import { Layout } from '@/components';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { calendarApi } from '@/services/api/calendarApi';
+import { meetingApi } from '@/services/api/meetingApi';
+
+export function CreateMeetingPage() {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    startTime: '',
+    endTime: '',
+    timezone: 'Asia/Seoul',
+  });
+
+  const handleInputChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >,
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleCreateMeeting = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.title || !formData.startTime || !formData.endTime) {
+      toast.error('필수 항목을 모두 입력해주세요.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // 먼저 캘린더 동기화
+      const syncResponse = await calendarApi.syncCalendar();
+
+      if (syncResponse.error) {
+        toast.error(`캘린더 동기화 실패: ${syncResponse.error}`);
+        setLoading(false);
+        return;
+      }
+
+      // 미팅 생성
+      const response = await meetingApi.createMeeting({
+        title: formData.title,
+        description: formData.description,
+        startTime: new Date(formData.startTime).toISOString(),
+        endTime: new Date(formData.endTime).toISOString(),
+        timezone: formData.timezone,
+      });
+
+      const inviteCode = response.data.inviteCode;
+      const shareUrl = `${window.location.origin}/meeting/${inviteCode}`;
+
+      // 링크 복사
+      navigator.clipboard.writeText(shareUrl);
+      toast.success('약속이 생성되었습니다! 링크가 복사되었습니다.');
+
+      // 공유 링크로 이동
+      navigate({ to: `/meeting/${inviteCode}` });
+    } catch (error) {
+      console.error('Error creating meeting:', error);
+      toast.error('약속 생성에 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Layout>
+      <div className="max-w-2xl mx-auto px-4 py-8">
+        <div className="border border-gray-200 rounded-lg p-8">
+          <h1 className="text-3xl font-bold mb-6">새 약속 만들기</h1>
+
+          <form onSubmit={handleCreateMeeting} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                약속 제목 *
+              </label>
+              <Input
+                type="text"
+                name="title"
+                placeholder="예: 팀 회의"
+                value={formData.title}
+                onChange={handleInputChange}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                설명
+              </label>
+              <textarea
+                name="description"
+                placeholder="약속에 대한 설명을 입력하세요"
+                value={formData.description}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                rows={4}
+              />
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  시작 시간 *
+                </label>
+                <Input
+                  type="datetime-local"
+                  name="startTime"
+                  value={formData.startTime}
+                  onChange={handleInputChange}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  종료 시간 *
+                </label>
+                <Input
+                  type="datetime-local"
+                  name="endTime"
+                  value={formData.endTime}
+                  onChange={handleInputChange}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                시간대
+              </label>
+              <select
+                name="timezone"
+                value={formData.timezone}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              >
+                <option value="Asia/Seoul">서울 (Asia/Seoul)</option>
+                <option value="UTC">UTC</option>
+                <option value="America/New_York">
+                  뉴욕 (America/New_York)
+                </option>
+                <option value="Europe/London">런던 (Europe/London)</option>
+                <option value="Asia/Tokyo">도쿄 (Asia/Tokyo)</option>
+              </select>
+            </div>
+
+            <div className="flex gap-4">
+              <Button type="submit" disabled={loading}>
+                {loading ? '생성 중...' : '약속 만들기'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => navigate({ to: '/' })}
+              >
+                취소
+              </Button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </Layout>
+  );
+}

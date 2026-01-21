@@ -1,23 +1,71 @@
 import { forwardRef } from 'react';
 
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
+
+import { useAuthStore } from '@/store/useAuthStore';
+
+import { Button } from './ui/button';
 
 export const Header = forwardRef<
   HTMLElementTagNameMap['header'],
   React.HTMLAttributes<HTMLElementTagNameMap['header']>
 >((_, ref) => {
+  const navigate = useNavigate();
+  const { isAuthenticated, user, logout } = useAuthStore();
+
+  const handleLogout = () => {
+    logout();
+    localStorage.removeItem('token');
+    navigate({ to: '/' });
+  };
+
   return (
     <header
       ref={ref}
-      className="p-2 flex gap-2 bg-white text-black justify-between"
+      className="border-b border-gray-200 bg-white sticky top-0 z-50"
     >
-      <nav className="flex flex-row">
-        <div className="px-2 font-bold">
-          <Link to="/">Home</Link>
-        </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex gap-4 justify-between items-center">
+        <nav className="flex flex-row gap-8 items-center">
+          <Link
+            to="/"
+            className="text-2xl font-bold text-gray-900 hover:text-gray-700"
+          >
+            MyTT
+          </Link>
 
-        <div className="px-2 font-bold">TanStack Query</div>
-      </nav>
+          {isAuthenticated && (
+            <>
+              <Link
+                to="/"
+                className="text-gray-600 hover:text-gray-900 font-medium"
+              >
+                대시보드
+              </Link>
+              <Link
+                to="/schedule/calendar"
+                className="text-gray-600 hover:text-gray-900 font-medium"
+              >
+                캘린더
+              </Link>
+            </>
+          )}
+        </nav>
+
+        <div className="flex items-center gap-4">
+          {isAuthenticated ? (
+            <>
+              <span className="text-sm text-gray-600">{user?.email}</span>
+              <Button variant="outline" size="sm" onClick={handleLogout}>
+                로그아웃
+              </Button>
+            </>
+          ) : (
+            <Link to="/auth/login">
+              <Button size="sm">시작하기</Button>
+            </Link>
+          )}
+        </div>
+      </div>
     </header>
   );
 });
