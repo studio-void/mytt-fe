@@ -17,12 +17,6 @@ interface TimeSlot {
   isOptimal: boolean;
 }
 
-interface BusySlot {
-  userId: number;
-  startTime: string;
-  endTime: string;
-}
-
 export function MeetingJoinPage() {
   const { inviteCode } = useParams({ strict: false });
   const navigate = useNavigate();
@@ -32,7 +26,6 @@ export function MeetingJoinPage() {
   const [joining, setJoining] = useState(false);
   const [meeting, setMeeting] = useState<any>(null);
   const [participants, setParticipants] = useState<any[]>([]);
-  const [busySlots, setBusySlots] = useState<BusySlot[]>([]);
   const [availabilitySlots, setAvailabilitySlots] = useState<TimeSlot[]>([]);
   const [hasJoined, setHasJoined] = useState(false);
 
@@ -65,7 +58,6 @@ export function MeetingJoinPage() {
         const availabilityResponse = await meetingApi.getMeetingAvailability(
           inviteCode!,
         );
-        setBusySlots(availabilityResponse.data.busySlots);
         setAvailabilitySlots(availabilityResponse.data.availabilitySlots);
       }
     } catch (error) {
