@@ -44,7 +44,9 @@ export function MeetingJoinPage() {
   const [meeting, setMeeting] = useState<any>(null);
   const [participants, setParticipants] = useState<any[]>([]);
   const [availabilitySlots, setAvailabilitySlots] = useState<TimeSlot[]>([]);
-  const [availabilityDocs, setAvailabilityDocs] = useState<AvailabilityDoc[]>([]);
+  const [availabilityDocs, setAvailabilityDocs] = useState<AvailabilityDoc[]>(
+    [],
+  );
   const [hasJoined, setHasJoined] = useState(false);
   const [manualBlocks, setManualBlocks] = useState<TimeBlock[]>([]);
   const [weekStart, setWeekStart] = useState<Date | null>(null);
@@ -215,7 +217,8 @@ export function MeetingJoinPage() {
   };
 
   const meetingRange = useMemo(
-    () => (meeting ? getMeetingRange(meeting.startTime, meeting.endTime) : null),
+    () =>
+      meeting ? getMeetingRange(meeting.startTime, meeting.endTime) : null,
     [meeting],
   );
 
@@ -379,7 +382,9 @@ export function MeetingJoinPage() {
                             : startOfWeek(meetingRange.start),
                         )
                       }
-                      disabled={!canMoveToPrevWeek(weekStart, meetingRange.start)}
+                      disabled={
+                        !canMoveToPrevWeek(weekStart, meetingRange.start)
+                      }
                     >
                       이전 주
                     </Button>
@@ -427,17 +432,25 @@ export function MeetingJoinPage() {
                       ))}
                     </div>
                     {availabilityWeekDays.map((day) => (
-                      <div key={day.toISOString()} className="border-l border-gray-100">
+                      <div
+                        key={day.toISOString()}
+                        className="border-l border-gray-100"
+                      >
                         {AVAIL_TIME_SLOTS.map((slotMinutes) => {
                           const slotStart = addMinutes(day, slotMinutes);
-                          const slotEnd = addMinutes(slotStart, AVAIL_SLOT_MINUTES);
+                          const slotEnd = addMinutes(
+                            slotStart,
+                            AVAIL_SLOT_MINUTES,
+                          );
                           const inRange =
                             slotStart >= meetingRange.start &&
                             slotEnd <= meetingRange.end;
                           const slotKey = slotStart.getTime();
                           const slot = availabilitySlotMap.get(slotKey);
                           const availability = slot?.availability ?? 0;
-                          const availabilityPercent = Math.round(availability * 100);
+                          const availabilityPercent = Math.round(
+                            availability * 100,
+                          );
                           const bgColor = inRange
                             ? getAvailabilityColor(availability)
                             : '#f8fafc';
@@ -447,7 +460,10 @@ export function MeetingJoinPage() {
                             <div
                               key={`${day.toISOString()}-${slotMinutes}`}
                               className="border-t border-gray-100 relative"
-                              style={{ height: AVAIL_SLOT_HEIGHT, backgroundColor: bgColor }}
+                              style={{
+                                height: AVAIL_SLOT_HEIGHT,
+                                backgroundColor: bgColor,
+                              }}
                               title={
                                 inRange && slot
                                   ? `${availabilityPercent}% (${slot.availableCount}/${participants.length})`
@@ -487,8 +503,9 @@ export function MeetingJoinPage() {
                       {formatTime(hoveredAvailability.slot.endTime)}
                     </div>
                     <div className="text-[11px] text-gray-500 mb-2">
-                      {Math.round(hoveredAvailability.slot.availability * 100)}% 가능 (
-                      {hoveredAvailability.slot.availableCount}/{participants.length})
+                      {Math.round(hoveredAvailability.slot.availability * 100)}%
+                      가능 ({hoveredAvailability.slot.availableCount}/
+                      {participants.length})
                     </div>
                     <div className="space-y-2">
                       {(() => {
@@ -576,7 +593,10 @@ export function MeetingJoinPage() {
                             : startOfWeek(meetingRange.start),
                         )
                       }
-                      disabled={!weekStart || !canMoveToPrevWeek(weekStart, meetingRange.start)}
+                      disabled={
+                        !weekStart ||
+                        !canMoveToPrevWeek(weekStart, meetingRange.start)
+                      }
                     >
                       이전 주
                     </Button>
@@ -590,7 +610,10 @@ export function MeetingJoinPage() {
                             : startOfWeek(meetingRange.start),
                         )
                       }
-                      disabled={!weekStart || !canMoveToNextWeek(weekStart, meetingRange.end)}
+                      disabled={
+                        !weekStart ||
+                        !canMoveToNextWeek(weekStart, meetingRange.end)
+                      }
                     >
                       다음 주
                     </Button>
@@ -727,7 +750,10 @@ export function MeetingJoinPage() {
 
 const SLOT_HEIGHT = 16;
 const SLOT_MINUTES = 15;
-const TIME_SLOTS = Array.from({ length: 96 }, (_, index) => index * SLOT_MINUTES);
+const TIME_SLOTS = Array.from(
+  { length: 96 },
+  (_, index) => index * SLOT_MINUTES,
+);
 const HOUR_LABELS = Array.from({ length: 24 }, (_, index) => `${index}:00`);
 const AVAIL_SLOT_MINUTES = 30;
 const AVAIL_SLOT_HEIGHT = 14;
@@ -735,13 +761,24 @@ const AVAIL_TIME_SLOTS = Array.from(
   { length: 48 },
   (_, index) => index * AVAIL_SLOT_MINUTES,
 );
-const AVAIL_HOUR_LABELS = Array.from({ length: 24 }, (_, index) => `${index}:00`);
+const AVAIL_HOUR_LABELS = Array.from(
+  { length: 24 },
+  (_, index) => `${index}:00`,
+);
 
 const startOfDay = (date: Date) =>
   new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
 
 const endOfDay = (date: Date) =>
-  new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+  new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    23,
+    59,
+    59,
+    999,
+  );
 
 const addMinutes = (date: Date, minutes: number) => {
   const next = new Date(date);
@@ -832,8 +869,8 @@ const buildBlocksFromSlots = (
 
   if (currentStart && currentEnd) {
     blocks.push({
-      startTime: currentStart.toISOString(),
-      endTime: currentEnd.toISOString(),
+      startTime: (currentStart as Date).toISOString(),
+      endTime: (currentEnd as Date).toISOString(),
     });
   }
 

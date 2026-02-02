@@ -3,7 +3,6 @@ import { useEffect } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 
 import { Layout } from '@/components';
-import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/useAuthStore';
 
 export const DashboardPage: React.FC = () => {

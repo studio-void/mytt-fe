@@ -1,7 +1,7 @@
 import { addMonths } from 'date-fns';
 import {
+  Timestamp,
   collection,
-  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -9,7 +9,6 @@ import {
   query,
   serverTimestamp,
   setDoc,
-  Timestamp,
   where,
   writeBatch,
 } from 'firebase/firestore';
@@ -258,7 +257,7 @@ const replaceShareLinkEvents = async (
 const getShareLinkDoc = async (linkDocId: string) => {
   const linkSnap = await getDoc(doc(db, SHARE_LINKS_COLLECTION, linkDocId));
   if (!linkSnap.exists()) return null;
-  return { id: linkSnap.id, ...(linkSnap.data() as ShareLink) };
+  return { ...(linkSnap.data() as ShareLink), id: linkSnap.id };
 };
 
 export const sharingApi = {
@@ -272,9 +271,10 @@ export const sharingApi = {
       ),
     );
     return {
-      data: snapshot.docs.map(
-        (docSnap) => ({ id: docSnap.id, ...(docSnap.data() as ShareLink) }),
-      ),
+      data: snapshot.docs.map((docSnap) => ({
+        ...(docSnap.data() as ShareLink),
+        id: docSnap.id,
+      })),
     };
   },
 
@@ -291,7 +291,9 @@ export const sharingApi = {
     const rawLinkId = data.linkId?.trim() || generateLinkId();
     const normalizedLinkId = normalizeLinkId(rawLinkId);
     if (!normalizedLinkId || !isValidLinkId(normalizedLinkId)) {
-      throw new Error('링크 ID는 3~32자의 영문/숫자/-/_ 만 사용할 수 있습니다.');
+      throw new Error(
+        '링크 ID는 3~32자의 영문/숫자/-/_ 만 사용할 수 있습니다.',
+      );
     }
     const linkDocId = buildShareLinkDocId(user.uid, normalizedLinkId);
     const linkRef = doc(db, SHARE_LINKS_COLLECTION, linkDocId);
@@ -329,11 +331,14 @@ export const sharingApi = {
     return { data: payload };
   },
 
-  updateShareLink: async (linkDocId: string, data: {
-    privacyLevel: PrivacyLevel;
-    audience: SharingAudience;
-    allowedEmails: string[];
-  }) => {
+  updateShareLink: async (
+    linkDocId: string,
+    data: {
+      privacyLevel: PrivacyLevel;
+      audience: SharingAudience;
+      allowedEmails: string[];
+    },
+  ) => {
     const user = ensureUser();
     const existing = await getShareLinkDoc(linkDocId);
     if (!existing) {
@@ -419,9 +424,10 @@ export const sharingApi = {
       ),
     );
 
-    const links = snapshot.docs.map(
-      (docSnap) => ({ id: docSnap.id, ...(docSnap.data() as ShareLink) }),
-    );
+    const links = snapshot.docs.map((docSnap) => ({
+      ...(docSnap.data() as ShareLink),
+      id: docSnap.id,
+    }));
 
     for (const link of links) {
       await replaceShareLinkEvents(link.id, user.uid, link.privacyLevel);
@@ -449,7 +455,7 @@ export const sharingApi = {
     try {
       const linkSnap = await getDoc(doc(db, SHARE_LINKS_COLLECTION, linkDocId));
       link = linkSnap.exists()
-        ? ({ id: linkSnap.id, ...(linkSnap.data() as ShareLink) } as ShareLink)
+        ? ({ ...(linkSnap.data() as ShareLink), id: linkSnap.id } as ShareLink)
         : null;
     } catch (error) {
       if (!isFirestorePermissionError(error)) {
@@ -467,7 +473,10 @@ export const sharingApi = {
 
     if (link.audience === 'restricted') {
       const allowedEmails = (link.allowedEmails ?? []).map(normalizeEmail);
-      if (!normalizedViewerEmail || !allowedEmails.includes(normalizedViewerEmail)) {
+      if (
+        !normalizedViewerEmail ||
+        !allowedEmails.includes(normalizedViewerEmail)
+      ) {
         return { error: 'access_denied', data: null };
       }
     }
@@ -528,7 +537,13 @@ export const sharingApi = {
     if (!auth.currentUser) {
       return { data: defaultSettings };
     }
-    const settingsRef = doc(db, 'users', auth.currentUser.uid, 'sharing', 'settings');
+    const settingsRef = doc(
+      db,
+      'users',
+      auth.currentUser.uid,
+      'sharing',
+      'settings',
+    );
     try {
       const snapshot = await getDoc(settingsRef);
       if (!snapshot.exists()) {

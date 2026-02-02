@@ -85,17 +85,11 @@ export function CalendarPage() {
       setLoading(true);
       const { start, end } = getRangeForView(currentDate, viewMode);
       const response = await calendarApi.getEvents(start, end);
-      if (response.error) {
-        console.error('Error loading calendar:', response.error);
-        toast.error(`캘린더 로드 실패: ${response.error}`);
-        setEvents([]);
-      } else {
-        // 필터링된 이벤트만 표시
-        const filtered = (response.data || []).filter((event: any) =>
-          selectedCalendars.includes(event.calendarId),
-        );
-        setEvents(filtered);
-      }
+      // 필터링된 이벤트만 표시
+      const filtered = (response.data || []).filter((event: any) =>
+        selectedCalendars.includes(event.calendarId),
+      );
+      setEvents(filtered);
     } catch (error) {
       console.error('Error loading calendar:', error);
       toast.error('캘린더 로드에 실패했습니다.');
@@ -244,7 +238,9 @@ export function CalendarPage() {
                 {formatHeaderLabel(currentDate, viewMode)}
               </div>
               <button
-                onClick={() => setCurrentDate(getNextDate(currentDate, viewMode))}
+                onClick={() =>
+                  setCurrentDate(getNextDate(currentDate, viewMode))
+                }
                 className="px-3 py-1.5 border border-gray-200 rounded hover:border-gray-400 text-sm"
               >
                 다음 →
@@ -358,9 +354,7 @@ export function CalendarPage() {
                         className="p-2 border-l border-gray-100"
                       >
                         {allDayEvents.length === 0 ? (
-                          <p className="text-xs text-gray-400">
-                            없음
-                          </p>
+                          <p className="text-xs text-gray-400">없음</p>
                         ) : (
                           <div className="flex flex-wrap gap-1">
                             {allDayEvents.map((event) => (
@@ -368,7 +362,8 @@ export function CalendarPage() {
                                 key={event.id}
                                 className="text-[11px] px-2 py-1 rounded-full text-white"
                                 style={{
-                                  backgroundColor: event.calendarColor || '#999999',
+                                  backgroundColor:
+                                    event.calendarColor || '#999999',
                                 }}
                                 title={event.title}
                               >
@@ -413,10 +408,7 @@ export function CalendarPage() {
                           />
                         ))}
                         {timedEvents.map((event) => {
-                          const { top, height } = getEventPosition(
-                            event,
-                            date,
-                          );
+                          const { top, height } = getEventPosition(event, date);
                           return (
                             <div
                               key={event.id}
@@ -424,7 +416,8 @@ export function CalendarPage() {
                               style={{
                                 top,
                                 height,
-                                backgroundColor: event.calendarColor || '#999999',
+                                backgroundColor:
+                                  event.calendarColor || '#999999',
                               }}
                               title={event.title}
                             >
@@ -603,9 +596,7 @@ export function CalendarPage() {
                   {calendars.length > 6 && (
                     <button
                       type="button"
-                      onClick={() =>
-                        setIsCalendarPickerOpen((prev) => !prev)
-                      }
+                      onClick={() => setIsCalendarPickerOpen((prev) => !prev)}
                       className="text-xs text-gray-500 flex items-center gap-1"
                     >
                       {isCalendarPickerOpen ? '접기' : '더 보기'}
@@ -653,14 +644,27 @@ export function CalendarPage() {
   );
 }
 
-const getRangeForView = (
-  date: Date,
-  viewMode: 'month' | 'week' | 'day',
-) => {
+const getRangeForView = (date: Date, viewMode: 'month' | 'week' | 'day') => {
   if (viewMode === 'day') {
     return {
-      start: new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0),
-      end: new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999),
+      start: new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate(),
+        0,
+        0,
+        0,
+        0,
+      ),
+      end: new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate(),
+        23,
+        59,
+        59,
+        999,
+      ),
     };
   }
   if (viewMode === 'week') {
@@ -673,7 +677,15 @@ const getRangeForView = (
     return { start, end };
   }
   const start = new Date(date.getFullYear(), date.getMonth(), 1, 0, 0, 0, 0);
-  const end = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+  const end = new Date(
+    date.getFullYear(),
+    date.getMonth() + 1,
+    0,
+    23,
+    59,
+    59,
+    999,
+  );
   return { start, end };
 };
 
@@ -709,10 +721,7 @@ const buildWeekDays = (date: Date) => {
   });
 };
 
-const formatHeaderLabel = (
-  date: Date,
-  viewMode: 'month' | 'week' | 'day',
-) => {
+const formatHeaderLabel = (date: Date, viewMode: 'month' | 'week' | 'day') => {
   if (viewMode === 'day') {
     return date.toLocaleDateString('ko-KR', {
       year: 'numeric',
@@ -740,10 +749,7 @@ const formatHeaderLabel = (
   });
 };
 
-const getPreviousDate = (
-  date: Date,
-  viewMode: 'month' | 'week' | 'day',
-) => {
+const getPreviousDate = (date: Date, viewMode: 'month' | 'week' | 'day') => {
   if (viewMode === 'day') {
     const next = new Date(date);
     next.setDate(next.getDate() - 1);
@@ -757,10 +763,7 @@ const getPreviousDate = (
   return new Date(date.getFullYear(), date.getMonth() - 1, 1);
 };
 
-const getNextDate = (
-  date: Date,
-  viewMode: 'month' | 'week' | 'day',
-) => {
+const getNextDate = (date: Date, viewMode: 'month' | 'week' | 'day') => {
   if (viewMode === 'day') {
     const next = new Date(date);
     next.setDate(next.getDate() + 1);
@@ -848,8 +851,7 @@ const getEventPosition = (event: CalendarEvent, date: Date) => {
   const eventEnd = new Date(event.endTime);
   const clampedStart = eventStart < dayStart ? dayStart : eventStart;
   const clampedEnd = eventEnd > dayEnd ? dayEnd : eventEnd;
-  const startMinutes =
-    clampedStart.getHours() * 60 + clampedStart.getMinutes();
+  const startMinutes = clampedStart.getHours() * 60 + clampedStart.getMinutes();
   const endMinutes = clampedEnd.getHours() * 60 + clampedEnd.getMinutes();
   const durationMinutes = Math.max(15, endMinutes - startMinutes);
   const top = (startMinutes / 60) * HOUR_HEIGHT;

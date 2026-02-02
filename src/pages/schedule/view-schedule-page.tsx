@@ -15,16 +15,16 @@ interface ScheduleEvent {
   description?: string;
   location?: string;
   isBusy: boolean;
+  isAllDay?: boolean;
   calendarTitle?: string;
   calendarColor?: string;
 }
 
 interface ScheduleData {
-  userEmail: string;
-  privacyLevel: string;
-  audience: string;
-  linkId: string;
-  events: ScheduleEvent[];
+  id?: string;
+  userEmail?: string;
+  privacyLevel?: 'busy_only' | 'basic_info' | 'full_details';
+  events?: ScheduleEvent[];
 }
 
 export function ViewSchedulePage() {
@@ -33,7 +33,7 @@ export function ViewSchedulePage() {
     id?: string;
   };
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, isAuthReady } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [schedule, setSchedule] = useState<ScheduleData | null>(null);
   const [events, setEvents] = useState<ScheduleEvent[]>([]);
@@ -49,8 +49,11 @@ export function ViewSchedulePage() {
       navigate({ to: '/' });
       return;
     }
+    if (!isAuthReady) {
+      return;
+    }
     loadSchedule();
-  }, [uid, id, user?.email]);
+  }, [uid, id, user?.email, isAuthReady]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -218,7 +221,9 @@ export function ViewSchedulePage() {
                 {formatHeaderLabel(currentDate, viewMode)}
               </div>
               <button
-                onClick={() => setCurrentDate(getNextDate(currentDate, viewMode))}
+                onClick={() =>
+                  setCurrentDate(getNextDate(currentDate, viewMode))
+                }
                 className="px-3 py-1.5 border border-gray-200 rounded hover:border-gray-400 text-sm"
               >
                 다음 →
@@ -277,7 +282,7 @@ export function ViewSchedulePage() {
                             title={event.title}
                           >
                             {event.isAllDay
-                              ? event.title ?? '바쁜 시간'
+                              ? (event.title ?? '바쁜 시간')
                               : `${new Date(event.startTime).toLocaleTimeString(
                                   'ko-KR',
                                   { hour: '2-digit', minute: '2-digit' },
@@ -376,7 +381,10 @@ export function ViewSchedulePage() {
                       getEventsForDate(date),
                       date,
                     );
-                    const positionedEvents = layoutTimedEvents(timedEvents, date);
+                    const positionedEvents = layoutTimedEvents(
+                      timedEvents,
+                      date,
+                    );
                     const nowTop = isSameDay(date, now)
                       ? getNowLineTop(now)
                       : null;
@@ -403,7 +411,8 @@ export function ViewSchedulePage() {
                           </div>
                         )}
                         {positionedEvents.map((positioned) => {
-                          const { top, height, left, width, event } = positioned;
+                          const { top, height, left, width, event } =
+                            positioned;
                           return (
                             <div
                               key={event.id}
@@ -624,7 +633,15 @@ const startOfDay = (date: Date) =>
   new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
 
 const endOfDay = (date: Date) =>
-  new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+  new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    23,
+    59,
+    59,
+    999,
+  );
 
 const isSameDay = (left: Date, right: Date) =>
   left.getFullYear() === right.getFullYear() &&
@@ -669,8 +686,7 @@ const getEventPosition = (event: ScheduleEvent, date: Date) => {
   const eventEnd = new Date(event.endTime);
   const clampedStart = eventStart < dayStart ? dayStart : eventStart;
   const clampedEnd = eventEnd > dayEnd ? dayEnd : eventEnd;
-  const startMinutes =
-    clampedStart.getHours() * 60 + clampedStart.getMinutes();
+  const startMinutes = clampedStart.getHours() * 60 + clampedStart.getMinutes();
   const endMinutes = clampedEnd.getHours() * 60 + clampedEnd.getMinutes();
   const durationMinutes = Math.max(15, endMinutes - startMinutes);
   const top = (startMinutes / 60) * HOUR_HEIGHT;
@@ -688,8 +704,7 @@ const getEventMinutes = (event: ScheduleEvent, date: Date) => {
   const eventEnd = new Date(event.endTime);
   const clampedStart = eventStart < dayStart ? dayStart : eventStart;
   const clampedEnd = eventEnd > dayEnd ? dayEnd : eventEnd;
-  const startMinutes =
-    clampedStart.getHours() * 60 + clampedStart.getMinutes();
+  const startMinutes = clampedStart.getHours() * 60 + clampedStart.getMinutes();
   const endMinutes = clampedEnd.getHours() * 60 + clampedEnd.getMinutes();
   return {
     startMinutes,
@@ -715,11 +730,10 @@ const layoutTimedEvents = (events: ScheduleEvent[], date: Date) => {
     width: string;
   }> = [];
 
-  let group: Array<typeof sorted[number]> = [];
+  let group: Array<(typeof sorted)[number]> = [];
   let groupEnd = -1;
 
   const flushGroup = () => {
-    if (group.length === 0) return;
     const columns: number[] = [];
     const assignments = new Map<string, { col: number; cols: number }>();
 
@@ -849,10 +863,7 @@ const buildWeekDays = (date: Date) => {
   });
 };
 
-const formatHeaderLabel = (
-  date: Date,
-  viewMode: 'month' | 'week' | 'day',
-) => {
+const formatHeaderLabel = (date: Date, viewMode: 'month' | 'week' | 'day') => {
   if (viewMode === 'day') {
     return date.toLocaleDateString('ko-KR', {
       year: 'numeric',
@@ -880,10 +891,7 @@ const formatHeaderLabel = (
   });
 };
 
-const getPreviousDate = (
-  date: Date,
-  viewMode: 'month' | 'week' | 'day',
-) => {
+const getPreviousDate = (date: Date, viewMode: 'month' | 'week' | 'day') => {
   if (viewMode === 'day') {
     const next = new Date(date);
     next.setDate(next.getDate() - 1);
@@ -897,10 +905,7 @@ const getPreviousDate = (
   return new Date(date.getFullYear(), date.getMonth() - 1, 1);
 };
 
-const getNextDate = (
-  date: Date,
-  viewMode: 'month' | 'week' | 'day',
-) => {
+const getNextDate = (date: Date, viewMode: 'month' | 'week' | 'day') => {
   if (viewMode === 'day') {
     const next = new Date(date);
     next.setDate(next.getDate() + 1);
