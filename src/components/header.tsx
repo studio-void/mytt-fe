@@ -2,6 +2,7 @@ import { forwardRef } from 'react';
 
 import { Link, useNavigate } from '@tanstack/react-router';
 
+import { authApi } from '@/services/api/authApi';
 import { useAuthStore } from '@/store/useAuthStore';
 
 import { Button } from './ui/button';
@@ -11,12 +12,12 @@ export const Header = forwardRef<
   React.HTMLAttributes<HTMLElementTagNameMap['header']>
 >((_, ref) => {
   const navigate = useNavigate();
-  const { isAuthenticated, user, logout } = useAuthStore();
+  const { isAuthenticated, user, isAuthReady } = useAuthStore();
 
   const handleLogout = () => {
-    logout();
-    localStorage.removeItem('token');
-    navigate({ to: '/' });
+    authApi.logout().finally(() => {
+      navigate({ to: '/' });
+    });
   };
 
   return (
@@ -36,7 +37,7 @@ export const Header = forwardRef<
           {isAuthenticated && (
             <>
               <Link
-                to="/"
+                to="/dashboard"
                 className="text-gray-600 hover:text-gray-900 font-medium"
               >
                 대시보드
@@ -54,6 +55,9 @@ export const Header = forwardRef<
         <div className="flex items-center gap-4">
           {isAuthenticated ? (
             <>
+              <Button size="sm" onClick={() => navigate({ to: '/dashboard' })}>
+                대시보드
+              </Button>
               <span className="text-sm text-gray-600">{user?.email}</span>
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 로그아웃
@@ -61,7 +65,9 @@ export const Header = forwardRef<
             </>
           ) : (
             <Link to="/auth/login">
-              <Button size="sm">시작하기</Button>
+              <Button size="sm" disabled={!isAuthReady}>
+                시작하기
+              </Button>
             </Link>
           )}
         </div>

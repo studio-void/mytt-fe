@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ScheduleShareRouteImport } from './routes/schedule/share'
 import { Route as ScheduleCalendarRouteImport } from './routes/schedule/calendar'
@@ -17,8 +18,13 @@ import { Route as MeetingCreateRouteImport } from './routes/meeting/create'
 import { Route as MeetingInviteCodeRouteImport } from './routes/meeting/$inviteCode'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
-import { Route as ScheduleViewUserIdRouteImport } from './routes/schedule/view/$userId'
+import { Route as ScheduleViewUidIdRouteImport } from './routes/schedule/view/$uid/$id'
 
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -59,14 +65,15 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
   path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ScheduleViewUserIdRoute = ScheduleViewUserIdRouteImport.update({
-  id: '/schedule/view/$userId',
-  path: '/schedule/view/$userId',
+const ScheduleViewUidIdRoute = ScheduleViewUidIdRouteImport.update({
+  id: '/schedule/view/$uid/$id',
+  path: '/schedule/view/$uid/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/meeting/$inviteCode': typeof MeetingInviteCodeRoute
@@ -74,10 +81,11 @@ export interface FileRoutesByFullPath {
   '/meeting/join': typeof MeetingJoinRoute
   '/schedule/calendar': typeof ScheduleCalendarRoute
   '/schedule/share': typeof ScheduleShareRoute
-  '/schedule/view/$userId': typeof ScheduleViewUserIdRoute
+  '/schedule/view/$uid/$id': typeof ScheduleViewUidIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/meeting/$inviteCode': typeof MeetingInviteCodeRoute
@@ -85,11 +93,12 @@ export interface FileRoutesByTo {
   '/meeting/join': typeof MeetingJoinRoute
   '/schedule/calendar': typeof ScheduleCalendarRoute
   '/schedule/share': typeof ScheduleShareRoute
-  '/schedule/view/$userId': typeof ScheduleViewUserIdRoute
+  '/schedule/view/$uid/$id': typeof ScheduleViewUidIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/meeting/$inviteCode': typeof MeetingInviteCodeRoute
@@ -97,12 +106,13 @@ export interface FileRoutesById {
   '/meeting/join': typeof MeetingJoinRoute
   '/schedule/calendar': typeof ScheduleCalendarRoute
   '/schedule/share': typeof ScheduleShareRoute
-  '/schedule/view/$userId': typeof ScheduleViewUserIdRoute
+  '/schedule/view/$uid/$id': typeof ScheduleViewUidIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/dashboard'
     | '/auth/callback'
     | '/auth/login'
     | '/meeting/$inviteCode'
@@ -110,10 +120,11 @@ export interface FileRouteTypes {
     | '/meeting/join'
     | '/schedule/calendar'
     | '/schedule/share'
-    | '/schedule/view/$userId'
+    | '/schedule/view/$uid/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/dashboard'
     | '/auth/callback'
     | '/auth/login'
     | '/meeting/$inviteCode'
@@ -121,10 +132,11 @@ export interface FileRouteTypes {
     | '/meeting/join'
     | '/schedule/calendar'
     | '/schedule/share'
-    | '/schedule/view/$userId'
+    | '/schedule/view/$uid/$id'
   id:
     | '__root__'
     | '/'
+    | '/dashboard'
     | '/auth/callback'
     | '/auth/login'
     | '/meeting/$inviteCode'
@@ -132,11 +144,12 @@ export interface FileRouteTypes {
     | '/meeting/join'
     | '/schedule/calendar'
     | '/schedule/share'
-    | '/schedule/view/$userId'
+    | '/schedule/view/$uid/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DashboardRoute: typeof DashboardRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   AuthLoginRoute: typeof AuthLoginRoute
   MeetingInviteCodeRoute: typeof MeetingInviteCodeRoute
@@ -144,11 +157,18 @@ export interface RootRouteChildren {
   MeetingJoinRoute: typeof MeetingJoinRoute
   ScheduleCalendarRoute: typeof ScheduleCalendarRoute
   ScheduleShareRoute: typeof ScheduleShareRoute
-  ScheduleViewUserIdRoute: typeof ScheduleViewUserIdRoute
+  ScheduleViewUidIdRoute: typeof ScheduleViewUidIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -205,11 +225,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/schedule/view/$userId': {
-      id: '/schedule/view/$userId'
-      path: '/schedule/view/$userId'
-      fullPath: '/schedule/view/$userId'
-      preLoaderRoute: typeof ScheduleViewUserIdRouteImport
+    '/schedule/view/$uid/$id': {
+      id: '/schedule/view/$uid/$id'
+      path: '/schedule/view/$uid/$id'
+      fullPath: '/schedule/view/$uid/$id'
+      preLoaderRoute: typeof ScheduleViewUidIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -217,6 +237,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DashboardRoute: DashboardRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   AuthLoginRoute: AuthLoginRoute,
   MeetingInviteCodeRoute: MeetingInviteCodeRoute,
@@ -224,7 +245,7 @@ const rootRouteChildren: RootRouteChildren = {
   MeetingJoinRoute: MeetingJoinRoute,
   ScheduleCalendarRoute: ScheduleCalendarRoute,
   ScheduleShareRoute: ScheduleShareRoute,
-  ScheduleViewUserIdRoute: ScheduleViewUserIdRoute,
+  ScheduleViewUidIdRoute: ScheduleViewUidIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

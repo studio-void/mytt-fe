@@ -2,6 +2,7 @@ export * from './fallback/not-found-page';
 export * from './home/home-page';
 export * from './auth/login-page';
 export * from './auth/google-callback-page';
+export * from './dashboard/dashboard-page';
 export * from './meeting/create-meeting-page';
 export * from './meeting/join-meeting-page';
 export * from './meeting/meeting-join-page';

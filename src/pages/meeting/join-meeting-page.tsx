@@ -7,17 +7,25 @@ import { Layout } from '@/components';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { meetingApi } from '@/services/api/meetingApi';
+import { useAuthStore } from '@/store/useAuthStore';
 
 export function JoinMeetingPage() {
   const navigate = useNavigate();
   const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const { isAuthenticated, isAuthReady } = useAuthStore();
 
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!inviteCode.trim()) {
       toast.error('초대 코드를 입력해주세요.');
+      return;
+    }
+
+    if (!isAuthenticated) {
+      toast.error('로그인이 필요합니다.');
+      navigate({ to: '/auth/login' });
       return;
     }
 
@@ -36,14 +44,18 @@ export function JoinMeetingPage() {
 
   return (
     <Layout>
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="rounded-lg p-8 max-w-md w-full">
           <h1 className="text-3xl font-bold mb-2">약속 참여하기</h1>
           <p className="text-gray-600 mb-6">공유받은 초대 코드를 입력하세요</p>
 
+          {!isAuthReady ? (
+            <p className="text-sm text-gray-500">로그인 상태 확인 중...</p>
+          ) : null}
+
           <form onSubmit={handleJoin} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium mb-2">
                 초대 코드
               </label>
               <Input

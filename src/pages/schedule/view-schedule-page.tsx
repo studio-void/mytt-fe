@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 
 import { Layout } from '@/components';
 import { sharingApi } from '@/services/api/sharingApi';
+import { useAuthStore } from '@/store/useAuthStore';
 
 interface ScheduleEvent {
   id: string;
@@ -14,32 +15,50 @@ interface ScheduleEvent {
   description?: string;
   location?: string;
   isBusy: boolean;
+  calendarTitle?: string;
 }
 
 export function ViewSchedulePage() {
-  const { userId } = useParams({ strict: false });
+  const { uid, id } = useParams({ strict: false }) as {
+    uid?: string;
+    id?: string;
+  };
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [schedule, setSchedule] = useState<any>(null);
   const [events, setEvents] = useState<ScheduleEvent[]>([]);
   const [privacyLevel, setPrivacyLevel] = useState<string>('busy_only');
+  const [accessDenied, setAccessDenied] = useState(false);
 
   useEffect(() => {
-    if (!userId) {
+    if (!uid || !id) {
       toast.error('유효하지 않은 링크입니다.');
       navigate({ to: '/' });
       return;
     }
     loadSchedule();
-  }, [userId]);
+  }, [uid, id, user?.email]);
 
   const loadSchedule = async () => {
     try {
       setLoading(true);
-      const response = await sharingApi.getUserSchedule(Number(userId));
-      setSchedule(response.data);
-      setEvents(response.data.events || []);
-      setPrivacyLevel(response.data.privacyLevel || 'busy_only');
+      const response = await sharingApi.getSharedSchedule(
+        String(uid),
+        String(id),
+        user?.email,
+      );
+      if (response.error === 'access_denied') {
+        setAccessDenied(true);
+        setSchedule(null);
+        setEvents([]);
+        return;
+      }
+      if (response.data) {
+        setSchedule(response.data);
+        setEvents(response.data.events || []);
+        setPrivacyLevel(response.data.privacyLevel || 'busy_only');
+      }
     } catch (error) {
       console.error('Error loading schedule:', error);
       toast.error('일정을 불러오는데 실패했습니다.');
@@ -79,6 +98,21 @@ export function ViewSchedulePage() {
     );
   }
 
+  if (accessDenied) {
+    return (
+      <Layout>
+        <div className="max-w-4xl mx-auto py-8">
+          <div className="text-center">
+            <p className="text-lg font-semibold mb-2">접근이 제한되었습니다.</p>
+            <p className="text-gray-500">
+              이 일정은 지정된 사람만 볼 수 있습니다.
+            </p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   if (!schedule) {
     return (
       <Layout>
@@ -112,7 +146,7 @@ export function ViewSchedulePage() {
             {events.map((event) => (
               <div
                 key={event.id}
-                className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors"
+                className="border border-gray-200 rounded-lg p-4 hover:border-gray-400 transition-colors"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -130,14 +164,19 @@ export function ViewSchedulePage() {
                       {formatTime(event.endTime)}
                     </div>
 
-                    {privacyLevel === 'basic_info' && event.location && (
+                    {privacyLevel === 'basic_info' && event.calendarTitle && (
                       <div className="text-sm text-gray-500 mt-1">
-                        📍 {event.location}
+                        📅 {event.calendarTitle}
                       </div>
                     )}
 
                     {privacyLevel === 'full_details' && (
                       <>
+                        {event.calendarTitle && (
+                          <div className="text-sm text-gray-500 mt-1">
+                            📅 {event.calendarTitle}
+                          </div>
+                        )}
                         {event.location && (
                           <div className="text-sm text-gray-500 mt-1">
                             📍 {event.location}

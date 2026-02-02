@@ -1,33 +1,46 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 
-interface User {
-  id: number;
-  email: string;
-  name: string;
+export interface AuthUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
 }
 
 interface AuthStore {
-  user: User | null;
-  token: string | null;
+  user: AuthUser | null;
   isAuthenticated: boolean;
-  setUser: (user: User | null) => void;
-  setToken: (token: string | null) => void;
-  logout: () => void;
+  isAuthReady: boolean;
+  googleAccessToken: string | null;
+  googleAccessTokenExpiresAt: number | null;
+  setUser: (user: AuthUser | null) => void;
+  setAuthReady: (ready: boolean) => void;
+  setGoogleAccessToken: (
+    token: string | null,
+    expiresAt: number | null,
+  ) => void;
+  reset: () => void;
 }
 
-export const useAuthStore = create<AuthStore>()(
-  persist(
-    (set) => ({
-      user: null,
-      token: null,
-      isAuthenticated: false,
-      setUser: (user) => set({ user, isAuthenticated: !!user }),
-      setToken: (token) => set({ token }),
-      logout: () => set({ user: null, token: null, isAuthenticated: false }),
+export const useAuthStore = create<AuthStore>((set) => ({
+  user: null,
+  isAuthenticated: false,
+  isAuthReady: false,
+  googleAccessToken: null,
+  googleAccessTokenExpiresAt: null,
+  setUser: (user) => set({ user, isAuthenticated: !!user }),
+  setAuthReady: (ready) => set({ isAuthReady: ready }),
+  setGoogleAccessToken: (token, expiresAt) =>
+    set({
+      googleAccessToken: token,
+      googleAccessTokenExpiresAt: expiresAt,
     }),
-    {
-      name: 'auth-storage',
-    },
-  ),
-);
+  reset: () =>
+    set({
+      user: null,
+      isAuthenticated: false,
+      isAuthReady: false,
+      googleAccessToken: null,
+      googleAccessTokenExpiresAt: null,
+    }),
+}));

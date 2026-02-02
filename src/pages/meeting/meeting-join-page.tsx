@@ -17,17 +17,26 @@ interface TimeSlot {
   isOptimal: boolean;
 }
 
+interface TimeBlock {
+  startTime: string;
+  endTime: string;
+}
+
 export function MeetingJoinPage() {
   const { inviteCode } = useParams({ strict: false });
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
 
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
+  const [savingBlocks, setSavingBlocks] = useState(false);
   const [meeting, setMeeting] = useState<any>(null);
   const [participants, setParticipants] = useState<any[]>([]);
   const [availabilitySlots, setAvailabilitySlots] = useState<TimeSlot[]>([]);
   const [hasJoined, setHasJoined] = useState(false);
+  const [manualBlocks, setManualBlocks] = useState<TimeBlock[]>([]);
+  const [blockStart, setBlockStart] = useState('');
+  const [blockEnd, setBlockEnd] = useState('');
 
   useEffect(() => {
     if (!inviteCode) {
@@ -47,18 +56,37 @@ export function MeetingJoinPage() {
       const meetingResponse = await meetingApi.getMeetingByCode(inviteCode!);
       setMeeting(meetingResponse.data);
 
+      if (!isAuthenticated) {
+        setParticipants([]);
+        setAvailabilitySlots([]);
+        setHasJoined(false);
+        setManualBlocks([]);
+        return;
+      }
+
       if (isAuthenticated) {
         // 참가자 정보 조회
         const participantsResponse = await meetingApi.getMeetingParticipants(
           inviteCode!,
         );
         setParticipants(participantsResponse.data);
+        const joined = participantsResponse.data.some(
+          (participant: { uid?: string }) => participant.uid === user?.uid,
+        );
+        setHasJoined(joined);
 
         // 가용성 정보 조회
         const availabilityResponse = await meetingApi.getMeetingAvailability(
           inviteCode!,
         );
         setAvailabilitySlots(availabilityResponse.data.availabilitySlots);
+
+        if (joined && meetingResponse.data?.id) {
+          const myAvailability = await meetingApi.getMyAvailability(
+            meetingResponse.data.id,
+          );
+          setManualBlocks(myAvailability.data?.manualBlocks ?? []);
+        }
       }
     } catch (error) {
       console.error('Error loading meeting:', error);
@@ -82,7 +110,12 @@ export function MeetingJoinPage() {
       setJoining(true);
 
       // 캘린더 동기화
-      const syncResponse = await calendarApi.syncCalendar();
+      const syncResponse = meeting
+        ? await calendarApi.syncCalendar(
+            new Date(meeting.startTime),
+            new Date(meeting.endTime),
+          )
+        : await calendarApi.syncCalendar();
 
       if (syncResponse.error) {
         toast.error(`캘린더 동기화 실패: ${syncResponse.error}`);
@@ -110,6 +143,55 @@ export function MeetingJoinPage() {
     const shareUrl = `${window.location.origin}/meeting/${inviteCode}`;
     navigator.clipboard.writeText(shareUrl);
     toast.success('초대 링크가 복사되었습니다!');
+  };
+
+  const handleAddBlock = () => {
+    if (!blockStart || !blockEnd) {
+      toast.error('시작/종료 시간을 선택해주세요.');
+      return;
+    }
+    const start = new Date(blockStart);
+    const end = new Date(blockEnd);
+    if (end <= start) {
+      toast.error('종료 시간이 시작 시간보다 늦어야 합니다.');
+      return;
+    }
+    if (meeting) {
+      const meetingStart = new Date(meeting.startTime);
+      const meetingEnd = new Date(meeting.endTime);
+      if (start < meetingStart || end > meetingEnd) {
+        toast.error('선택한 시간은 약속 범위 안에 있어야 합니다.');
+        return;
+      }
+    }
+    setManualBlocks((prev) => [
+      ...prev,
+      { startTime: start.toISOString(), endTime: end.toISOString() },
+    ]);
+    setBlockStart('');
+    setBlockEnd('');
+  };
+
+  const handleRemoveBlock = (index: number) => {
+    setManualBlocks((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleSaveBlocks = async () => {
+    if (!meeting?.id) return;
+    try {
+      setSavingBlocks(true);
+      await meetingApi.updateManualBlocks(meeting.id, manualBlocks);
+      const availabilityResponse = await meetingApi.getMeetingAvailability(
+        inviteCode!,
+      );
+      setAvailabilitySlots(availabilityResponse.data.availabilitySlots);
+      toast.success('차단 시간이 저장되었습니다.');
+    } catch (error) {
+      console.error('Error saving blocks:', error);
+      toast.error('차단 시간 저장에 실패했습니다.');
+    } finally {
+      setSavingBlocks(false);
+    }
   };
 
   const formatTime = (dateString: string) => {
@@ -196,7 +278,7 @@ export function MeetingJoinPage() {
                 {participants.map((participant, index) => (
                   <div
                     key={index}
-                    className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+                    className="px-3 py-1 border border-gray-200 rounded-full text-sm"
                   >
                     {participant.email}
                   </div>
@@ -212,8 +294,8 @@ export function MeetingJoinPage() {
             <h2 className="text-2xl font-bold mb-6">최적의 시간 찾기</h2>
 
             {/* 최적 시간대 추천 */}
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-              <h3 className="font-semibold text-green-800 mb-2">
+            <div className="mb-6 p-4 border border-gray-200 rounded-lg">
+              <h3 className="font-semibold text-gray-900 mb-2">
                 ⭐ 추천 시간대 (모든 참가자가 가능한 시간)
               </h3>
               <div className="space-y-2">
@@ -223,7 +305,7 @@ export function MeetingJoinPage() {
                   .map((slot, index) => (
                     <div
                       key={index}
-                      className="flex items-center justify-between p-3 bg-white rounded border border-green-300"
+                      className="flex items-center justify-between p-3 border border-gray-200 rounded"
                     >
                       <span className="font-medium">
                         {formatDate(slot.startTime)}{' '}
@@ -252,50 +334,116 @@ export function MeetingJoinPage() {
                   const availabilityPercent = Math.round(
                     slot.availability * 100,
                   );
-                  let bgColor = 'bg-red-100';
-                  let textColor = 'text-red-800';
+                  let bgColor = 'bg-red-50';
+                  let textColor = 'text-red-700';
+                  let barColor = 'bg-red-500';
 
                   if (availabilityPercent === 100) {
-                    bgColor = 'bg-green-100';
-                    textColor = 'text-green-800';
+                    bgColor = 'bg-green-50';
+                    textColor = 'text-green-700';
+                    barColor = 'bg-green-500';
                   } else if (availabilityPercent >= 70) {
-                    bgColor = 'bg-yellow-100';
-                    textColor = 'text-yellow-800';
+                    bgColor = 'bg-yellow-50';
+                    textColor = 'text-yellow-700';
+                    barColor = 'bg-yellow-500';
                   }
 
                   return (
                     <div
                       key={index}
-                      className={`flex items-center justify-between p-3 rounded ${bgColor}`}
+                      className={`flex items-center justify-between p-3 rounded border border-gray-200 ${bgColor}`}
                     >
-                      <span className="font-medium">
+                      <span className="font-medium text-sm">
                         {formatDate(slot.startTime)}{' '}
                         {formatTime(slot.startTime)} -{' '}
                         {formatTime(slot.endTime)}
                       </span>
                       <div className="flex items-center gap-4">
-                        <span className={textColor}>
+                        <span className={`text-sm ${textColor}`}>
                           {slot.availableCount}/{participants.length}명 가능
                         </span>
                         <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
                           <div
-                            className={`h-full ${
-                              availabilityPercent === 100
-                                ? 'bg-green-500'
-                                : availabilityPercent >= 70
-                                  ? 'bg-yellow-500'
-                                  : 'bg-red-500'
-                            }`}
+                            className={barColor}
                             style={{ width: `${availabilityPercent}%` }}
                           />
                         </div>
-                        <span className="text-sm font-semibold">
+                        <span className="text-sm font-semibold text-gray-600 w-10">
                           {availabilityPercent}%
                         </span>
                       </div>
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isAuthenticated && hasJoined && (
+          <div className="border border-gray-200 rounded-lg p-8 mt-6">
+            <h2 className="text-xl font-bold mb-4">내 일정에서 제외할 시간</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Google 캘린더에 없는 일정도 직접 차단할 수 있습니다.
+            </p>
+            <div className="grid md:grid-cols-3 gap-4 items-end">
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  시작 시간
+                </label>
+                <input
+                  type="datetime-local"
+                  value={blockStart}
+                  onChange={(e) => setBlockStart(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-md"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  종료 시간
+                </label>
+                <input
+                  type="datetime-local"
+                  value={blockEnd}
+                  onChange={(e) => setBlockEnd(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-md"
+                />
+              </div>
+              <Button onClick={handleAddBlock} type="button">
+                차단 시간 추가
+              </Button>
+            </div>
+
+            <div className="mt-6 space-y-2">
+              {manualBlocks.length > 0 ? (
+                manualBlocks.map((block, index) => (
+                  <div
+                    key={`${block.startTime}-${index}`}
+                    className="flex items-center justify-between p-3 border border-gray-200 rounded"
+                  >
+                    <span className="text-sm">
+                      {formatDate(block.startTime)}{' '}
+                      {formatTime(block.startTime)} -{' '}
+                      {formatTime(block.endTime)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveBlock(index)}
+                      className="text-sm text-gray-500 hover:text-gray-800"
+                    >
+                      삭제
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-gray-500">
+                  등록된 차단 시간이 없습니다.
+                </p>
+              )}
+              <div className="pt-4">
+                <Button onClick={handleSaveBlocks} disabled={savingBlocks}>
+                  {savingBlocks ? '저장 중...' : '차단 시간 저장'}
+                </Button>
               </div>
             </div>
           </div>
