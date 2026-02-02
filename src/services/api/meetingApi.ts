@@ -91,7 +91,7 @@ const generateUniqueInviteCode = async () => {
 };
 
 const deleteSubcollection = async (
-  path: Array<string>,
+  path: [string, ...string[]],
   chunkSize = 450,
 ) => {
   const ref = collection(db, ...path);
