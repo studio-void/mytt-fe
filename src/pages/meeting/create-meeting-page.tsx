@@ -14,6 +14,7 @@ export function CreateMeetingPage() {
   const navigate = useNavigate();
   const { isAuthenticated, isAuthReady } = useAuthStore();
   const [loading, setLoading] = useState(false);
+  const [manualSyncing, setManualSyncing] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -50,21 +51,6 @@ export function CreateMeetingPage() {
 
     setLoading(true);
     try {
-      // 먼저 캘린더 동기화
-      const syncResponse = await calendarApi.syncCalendar(
-        new Date(formData.startTime),
-        new Date(formData.endTime),
-      );
-
-      if (syncResponse.error) {
-        toast.error(`캘린더 동기화 실패: ${syncResponse.error}`);
-        setLoading(false);
-        return;
-      }
-      if (syncResponse.data?.skipped) {
-        toast.message('동기화가 너무 빈번해 잠시 건너뛰었습니다.');
-      }
-
       // 미팅 생성
       const response = await meetingApi.createMeeting({
         title: formData.title,
@@ -88,6 +74,34 @@ export function CreateMeetingPage() {
       toast.error('약속 생성에 실패했습니다.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleManualSync = async () => {
+    if (!formData.startTime || !formData.endTime) {
+      toast.error('시작/종료 시간을 먼저 입력해주세요.');
+      return;
+    }
+    try {
+      setManualSyncing(true);
+      const response = await calendarApi.syncCalendar(
+        new Date(formData.startTime),
+        new Date(formData.endTime),
+      );
+      if (response.error) {
+        toast.error(`캘린더 동기화 실패: ${response.error}`);
+        return;
+      }
+      if (response.data?.skipped) {
+        toast.message('동기화가 너무 빈번해 잠시 건너뛰었습니다.');
+      } else {
+        toast.success('캘린더가 동기화되었습니다.');
+      }
+    } catch (error) {
+      console.error('Error syncing calendar:', error);
+      toast.error('캘린더 동기화에 실패했습니다.');
+    } finally {
+      setManualSyncing(false);
     }
   };
 
@@ -170,6 +184,14 @@ export function CreateMeetingPage() {
             <div className="flex gap-4">
               <Button type="submit" disabled={loading}>
                 {loading ? '생성 중...' : '약속 만들기'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleManualSync}
+                disabled={manualSyncing}
+              >
+                {manualSyncing ? '동기화 중...' : '수동 동기화'}
               </Button>
               <Button
                 type="button"

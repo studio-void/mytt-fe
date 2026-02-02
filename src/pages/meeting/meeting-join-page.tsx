@@ -49,6 +49,7 @@ export function MeetingJoinPage() {
   );
   const [hasJoined, setHasJoined] = useState(false);
   const [manualBlocks, setManualBlocks] = useState<TimeBlock[]>([]);
+  const [manualSyncing, setManualSyncing] = useState(false);
   const [weekStart, setWeekStart] = useState<Date | null>(null);
   const [blockedSlots, setBlockedSlots] = useState<Set<string>>(new Set());
   const [isDragging, setIsDragging] = useState(false);
@@ -137,23 +138,6 @@ export function MeetingJoinPage() {
     try {
       setJoining(true);
 
-      // 캘린더 동기화
-      const syncResponse = meeting
-        ? await calendarApi.syncCalendar(
-            new Date(meeting.startTime),
-            new Date(meeting.endTime),
-          )
-        : await calendarApi.syncCalendar();
-
-      if (syncResponse.error) {
-        toast.error(`캘린더 동기화 실패: ${syncResponse.error}`);
-        setJoining(false);
-        return;
-      }
-      if (syncResponse.data?.skipped) {
-        toast.message('동기화가 너무 빈번해 잠시 건너뛰었습니다.');
-      }
-
       // 미팅 참여
       await meetingApi.joinMeetingByCode(inviteCode!);
 
@@ -198,6 +182,51 @@ export function MeetingJoinPage() {
       toast.error('차단 시간 저장에 실패했습니다.');
     } finally {
       setSavingBlocks(false);
+    }
+  };
+
+  const handleDeleteMeeting = async () => {
+    if (!meeting?.inviteCode) return;
+    const confirmed = window.confirm('약속을 삭제할까요? 되돌릴 수 없습니다.');
+    if (!confirmed) return;
+    try {
+      await meetingApi.deleteMeetingByCode(meeting.inviteCode);
+      toast.success('약속이 삭제되었습니다.');
+      navigate({ to: '/dashboard' });
+    } catch (error) {
+      console.error('Error deleting meeting:', error);
+      toast.error('약속 삭제에 실패했습니다.');
+    }
+  };
+
+  const handleManualSync = async () => {
+    if (!meeting?.id) return;
+    try {
+      setManualSyncing(true);
+      const response = await calendarApi.syncCalendar(
+        new Date(meeting.startTime),
+        new Date(meeting.endTime),
+      );
+      if (response.error) {
+        toast.error(`캘린더 동기화 실패: ${response.error}`);
+        return;
+      }
+      if (response.data?.skipped) {
+        toast.message('동기화가 너무 빈번해 잠시 건너뛰었습니다.');
+      } else {
+        toast.success('캘린더가 동기화되었습니다.');
+      }
+      await meetingApi.updateManualBlocks(meeting.id, derivedBlocks);
+      const availabilityResponse = await meetingApi.getMeetingAvailability(
+        inviteCode!,
+      );
+      setAvailabilitySlots(availabilityResponse.data.availabilitySlots);
+      setAvailabilityDocs(availabilityResponse.data.availabilityDocs ?? []);
+    } catch (error) {
+      console.error('Error manual sync:', error);
+      toast.error('동기화에 실패했습니다.');
+    } finally {
+      setManualSyncing(false);
     }
   };
 
@@ -331,6 +360,20 @@ export function MeetingJoinPage() {
               <Button onClick={copyInviteLink} variant="outline">
                 링크 복사
               </Button>
+              {isAuthenticated && (
+                <Button
+                  onClick={handleManualSync}
+                  variant="outline"
+                  disabled={manualSyncing}
+                >
+                  {manualSyncing ? '동기화 중...' : '수동 동기화'}
+                </Button>
+              )}
+              {isAuthenticated && user?.uid === meeting.hostUid && (
+                <Button variant="destructive" onClick={handleDeleteMeeting}>
+                  약속 삭제
+                </Button>
+              )}
               {!hasJoined && isAuthenticated && (
                 <Button onClick={handleJoinMeeting} disabled={joining}>
                   {joining ? '참여 중...' : '약속 참여'}
@@ -924,7 +967,7 @@ const getSlotAvailabilityDetails = (
   participants.forEach((participant) => {
     const doc = availabilityDocs.get(participant.uid);
     if (!doc) {
-      unavailable.push(participant.email);
+      available.push(`${participant.email} (미응답)`);
       return;
     }
     const isBusy = doc.busyBlocks.some((block) =>

@@ -2,6 +2,7 @@ import { addMonths } from 'date-fns';
 import {
   Timestamp,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -19,6 +20,7 @@ import {
   isFirestoreOfflineError,
   isFirestorePermissionError,
 } from '@/services/firebase';
+import { readBucketEvents } from '@/services/api/eventBuckets';
 
 export type PrivacyLevel = 'busy_only' | 'basic_info' | 'full_details';
 export type SharingAudience = 'public' | 'restricted';
@@ -49,7 +51,7 @@ interface SharedEvent {
 
 const SHARE_LINKS_COLLECTION = 'shareLinks';
 const SHARE_EVENTS_SUBCOLLECTION = 'events';
-const SHARE_RANGE_MONTHS = 3;
+const SHARE_RANGE_MONTHS = 2;
 const MAX_BATCH_SIZE = 450;
 
 const defaultSettings = {
@@ -141,12 +143,6 @@ const stripUndefined = <T extends Record<string, unknown>>(value: T) =>
     Object.entries(value).filter(([, entry]) => entry !== undefined),
   ) as T;
 
-const chunkedCommit = async (batches: Array<ReturnType<typeof writeBatch>>) => {
-  for (const batch of batches) {
-    await batch.commit();
-  }
-};
-
 const ensureUser = () => {
   if (!auth.currentUser) {
     throw new Error('로그인이 필요합니다.');
@@ -160,31 +156,8 @@ const buildRange = () => {
   return { start, end };
 };
 
-const fetchOwnerEvents = async (ownerUid: string, start: Date, end: Date) => {
-  const eventsRef = collection(db, 'users', ownerUid, 'events');
-  const snapshot = await getDocs(
-    query(
-      eventsRef,
-      where('startTime', '<=', Timestamp.fromDate(end)),
-      orderBy('startTime'),
-    ),
-  );
-  return snapshot.docs
-    .map((docSnap) => ({
-      id: docSnap.id,
-      ...(docSnap.data() as {
-        title?: string;
-        description?: string;
-        location?: string;
-        startTime: Timestamp;
-        endTime: Timestamp;
-        isBusy: boolean;
-        calendarTitle?: string;
-        calendarColor?: string;
-      }),
-    }))
-    .filter((event) => event.endTime.toDate() >= start);
-};
+const fetchOwnerEvents = async (ownerUid: string, start: Date, end: Date) =>
+  readBucketEvents(ownerUid, start, end);
 
 const replaceShareLinkEvents = async (
   linkDocId: string,
@@ -243,13 +216,11 @@ const replaceShareLinkEvents = async (
   });
 
   batches.push(batch);
-  await chunkedCommit(batches);
+  await Promise.all(batches.map((nextBatch) => nextBatch.commit()));
 
   await setDoc(
     doc(db, SHARE_LINKS_COLLECTION, linkDocId),
-    {
-      lastSyncedAt: serverTimestamp(),
-    },
+    { lastSyncedAt: serverTimestamp() },
     { merge: true },
   );
 };
@@ -382,7 +353,6 @@ export const sharingApi = {
     if (existing.ownerUid !== user.uid) {
       throw new Error('삭제 권한이 없습니다.');
     }
-
     const eventsRef = collection(
       db,
       SHARE_LINKS_COLLECTION,
@@ -410,7 +380,7 @@ export const sharingApi = {
 
     batch.delete(doc(db, SHARE_LINKS_COLLECTION, linkDocId));
     batches.push(batch);
-    await chunkedCommit(batches);
+    await Promise.all(batches.map((nextBatch) => nextBatch.commit()));
 
     return { data: true };
   },
@@ -481,14 +451,14 @@ export const sharingApi = {
       }
     }
 
+    const { start, end } = buildRange();
+
     const eventsRef = collection(
       db,
       SHARE_LINKS_COLLECTION,
       linkDocId,
       SHARE_EVENTS_SUBCOLLECTION,
     );
-    const { start, end } = buildRange();
-
     let eventsSnapshot;
     try {
       eventsSnapshot = await getDocs(

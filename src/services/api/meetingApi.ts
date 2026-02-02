@@ -1,6 +1,7 @@
 import { addMinutes } from 'date-fns';
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -10,9 +11,14 @@ import {
   setDoc,
   Timestamp,
   where,
+  writeBatch,
 } from 'firebase/firestore';
 
 import { auth, db } from '@/services/firebase';
+import {
+  readBucketEvents,
+  readMonthBucketEvents,
+} from '@/services/api/eventBuckets';
 
 interface MeetingDoc {
   title: string;
@@ -84,6 +90,30 @@ const generateUniqueInviteCode = async () => {
   return generateInviteCode();
 };
 
+const deleteSubcollection = async (
+  path: Array<string>,
+  chunkSize = 450,
+) => {
+  const ref = collection(db, ...path);
+  const snapshot = await getDocs(ref);
+  let batch = writeBatch(db);
+  let batchCount = 0;
+  const commits: Array<ReturnType<typeof batch.commit>> = [];
+
+  snapshot.docs.forEach((docSnap) => {
+    batch.delete(docSnap.ref);
+    batchCount += 1;
+    if (batchCount >= chunkSize) {
+      commits.push(batch.commit());
+      batch = writeBatch(db);
+      batchCount = 0;
+    }
+  });
+
+  commits.push(batch.commit());
+  await Promise.all(commits);
+};
+
 const normalizeBlock = (block: TimeBlock) => {
   const start = new Date(block.startTime);
   const end = new Date(block.endTime);
@@ -124,23 +154,8 @@ const meetingToClient = (meeting: { id: string } & MeetingDoc) => ({
   createdAt: meeting.createdAt?.toDate().toISOString() ?? null,
 });
 
-const fetchUserEvents = async (uid: string, start: Date, end: Date) => {
-  const eventsRef = collection(db, 'users', uid, 'events');
-  const snapshot = await getDocs(
-    query(
-      eventsRef,
-      where('startTime', '<=', Timestamp.fromDate(end)),
-      orderBy('startTime'),
-    ),
-  );
-  return snapshot.docs
-    .map((docSnap) => docSnap.data() as {
-    startTime: Timestamp;
-    endTime: Timestamp;
-    isBusy: boolean;
-  })
-    .filter((event) => event.endTime.toDate() >= start);
-};
+const fetchUserEvents = async (uid: string, start: Date, end: Date) =>
+  readBucketEvents(uid, start, end);
 
 const buildBusyBlocks = (
   events: Array<{ startTime: Timestamp; endTime: Timestamp; isBusy: boolean }>,
@@ -215,19 +230,27 @@ const buildAvailabilitySlots = (
   availabilityDocs.forEach((doc) => availabilityMap.set(doc.uid, doc));
   const slots: AvailabilitySlot[] = [];
 
-  for (
-    let cursor = new Date(start);
-    cursor < end;
-    cursor = addMinutes(cursor, SLOT_MINUTES)
-  ) {
-    const slotStart = new Date(cursor);
+  const rangeStart = new Date(start);
+  const rangeEnd = new Date(end);
+  const cursor = new Date(start);
+  cursor.setHours(0, 0, 0, 0);
+  const endCursor = new Date(end);
+  endCursor.setHours(23, 59, 59, 999);
+
+  for (let slotCursor = new Date(cursor); slotCursor < endCursor; ) {
+    const slotStart = new Date(slotCursor);
     const slotEnd = addMinutes(slotStart, SLOT_MINUTES);
-    if (slotEnd > end) break;
+    slotCursor = slotEnd;
+
+    if (slotStart < rangeStart || slotEnd > rangeEnd) {
+      continue;
+    }
 
     let availableCount = 0;
     participants.forEach((participant) => {
       const availability = availabilityMap.get(participant.uid);
       if (!availability) {
+        availableCount += 1;
         return;
       }
       const isBusy = availability.busyBlocks.some((block) =>
@@ -265,11 +288,13 @@ export const meetingApi = {
     const user = ensureUser();
     const inviteCode = await generateUniqueInviteCode();
     const meetingRef = doc(collection(db, 'meetings'));
+    const startDate = new Date(data.startTime);
+    const endDate = new Date(data.endTime);
     const meetingData: MeetingDoc = {
       title: data.title,
       description: data.description,
-      startTime: Timestamp.fromDate(new Date(data.startTime)),
-      endTime: Timestamp.fromDate(new Date(data.endTime)),
+      startTime: Timestamp.fromDate(startDate),
+      endTime: Timestamp.fromDate(endDate),
       timezone: data.timezone,
       hostUid: user.uid,
       inviteCode,
@@ -286,12 +311,27 @@ export const meetingApi = {
       displayName: user.displayName,
       photoURL: user.photoURL,
     });
-    await upsertAvailability(
-      meetingRef.id,
-      user.uid,
-      new Date(data.startTime),
-      new Date(data.endTime),
-      [],
+    const spansMonth =
+      startDate.getFullYear() !== endDate.getFullYear() ||
+      startDate.getMonth() !== endDate.getMonth();
+    const sourceEvents = spansMonth
+      ? await readBucketEvents(user.uid, startDate, endDate)
+      : await readMonthBucketEvents(user.uid, startDate);
+    const scopedEvents = sourceEvents.filter(
+      (event) =>
+        event.endTime.toDate() >= startDate &&
+        event.startTime.toDate() <= endDate,
+    );
+    const busyBlocks = buildBusyBlocks(scopedEvents, []);
+    await setDoc(
+      doc(db, 'meetings', meetingRef.id, 'availability', user.uid),
+      {
+        uid: user.uid,
+        busyBlocks,
+        manualBlocks: [],
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
     );
 
     return {
@@ -353,6 +393,23 @@ export const meetingApi = {
       meeting.endTime.toDate(),
       existingBlocks,
     );
+
+    return { data: true };
+  },
+
+  deleteMeetingByCode: async (inviteCode: string) => {
+    const user = ensureUser();
+    const meeting = await fetchMeetingByInviteCode(inviteCode);
+    if (!meeting) {
+      throw new Error('약속을 찾을 수 없습니다.');
+    }
+    if (meeting.hostUid !== user.uid) {
+      throw new Error('삭제 권한이 없습니다.');
+    }
+
+    await deleteSubcollection(['meetings', meeting.id, 'participants']);
+    await deleteSubcollection(['meetings', meeting.id, 'availability']);
+    await deleteDoc(doc(db, 'meetings', meeting.id));
 
     return { data: true };
   },
@@ -423,6 +480,29 @@ export const meetingApi = {
     const availabilityDocs = availabilitySnap.docs.map(
       (docSnap) => docSnap.data() as AvailabilityDoc,
     );
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      const isParticipant = participants.some(
+        (participant) => participant.uid === currentUser.uid,
+      );
+      const hasAvailability = availabilityDocs.some(
+        (doc) => doc.uid === currentUser.uid,
+      );
+      if (isParticipant && !hasAvailability) {
+        await upsertAvailability(
+          meeting.id,
+          currentUser.uid,
+          meeting.startTime.toDate(),
+          meeting.endTime.toDate(),
+          [],
+        );
+        availabilityDocs.push({
+          uid: currentUser.uid,
+          busyBlocks: [],
+          manualBlocks: [],
+        });
+      }
+    }
     const availabilitySlots = buildAvailabilitySlots(
       meeting.startTime.toDate(),
       meeting.endTime.toDate(),

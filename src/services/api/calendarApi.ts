@@ -10,18 +10,23 @@ import {
   serverTimestamp,
   setDoc,
   Timestamp,
-  where,
   writeBatch,
 } from 'firebase/firestore';
 
 import { auth, db } from '@/services/firebase';
 
 import { authApi } from './authApi';
+import {
+  getBucketIdsForRange,
+  readBucketEvents,
+  writeEventBuckets,
+} from './eventBuckets';
 
 const GOOGLE_CALENDAR_BASE = 'https://www.googleapis.com/calendar/v3';
 const DEFAULT_RANGE_MONTHS = 2;
 const MAX_BATCH_SIZE = 450;
 const SYNC_COOLDOWN_MINUTES = 30;
+const ENABLE_SYNC_COOLDOWN = false;
 
 interface GoogleCalendarListItem {
   id: string;
@@ -197,18 +202,36 @@ export const calendarApi = {
       const lastSyncedAt = userSnap.exists()
         ? (userSnap.data()?.calendarSync?.updatedAt as Timestamp | undefined)
         : undefined;
-      if (lastSyncedAt) {
+      if (ENABLE_SYNC_COOLDOWN && lastSyncedAt) {
         const lastSyncMs = lastSyncedAt.toMillis();
         const cooldownMs = SYNC_COOLDOWN_MINUTES * 60 * 1000;
         if (Date.now() - lastSyncMs < cooldownMs) {
-          return {
-            data: {
-              skipped: true,
-              reason: 'cooldown',
-              lastSyncedAt: lastSyncedAt.toDate(),
-              nextSyncAt: new Date(lastSyncMs + cooldownMs),
-            },
-          };
+          const { start, end } = getRange(startDate, endDate);
+          const bucketIds = getBucketIdsForRange(start, end);
+          const bucketSnaps = await Promise.all(
+            bucketIds.map((bucketId) =>
+              getDoc(
+                doc(
+                  db,
+                  'users',
+                  auth.currentUser!.uid,
+                  'eventBuckets',
+                  bucketId,
+                ),
+              ),
+            ),
+          );
+          const hasBuckets = bucketSnaps.some((snap) => snap.exists());
+          if (hasBuckets) {
+            return {
+              data: {
+                skipped: true,
+                reason: 'cooldown',
+                lastSyncedAt: lastSyncedAt.toDate(),
+                nextSyncAt: new Date(lastSyncMs + cooldownMs),
+              },
+            };
+          }
         }
       }
       const token = await authApi.getGoogleAccessToken();
@@ -265,30 +288,10 @@ export const calendarApi = {
         commitIfNeeded();
       });
 
-      events.forEach((event) => {
-        const eventRef = doc(
-          db,
-          'users',
-          auth.currentUser!.uid,
-          'events',
-          encodeDocId(`${event.calendarId}__${event.id}`),
-        );
-        batch.set(
-          eventRef,
-          stripUndefined({
-            ...event,
-            startTime: Timestamp.fromDate(event.startTime),
-            endTime: Timestamp.fromDate(event.endTime),
-            updatedAt: serverTimestamp(),
-          }),
-          { merge: true },
-        );
-        batchCount += 1;
-        commitIfNeeded();
-      });
-
       batches.push(batch);
       await chunkedBatchCommit(batches);
+
+      await writeEventBuckets(auth.currentUser.uid, events, start, end);
 
       await setDoc(
         doc(db, 'users', auth.currentUser.uid),
@@ -335,32 +338,18 @@ export const calendarApi = {
     if (!auth.currentUser) {
       return { data: [] as StoredEvent[] };
     }
-    const eventsRef = collection(
-      db,
-      'users',
+    const bucketEvents = await readBucketEvents(
       auth.currentUser.uid,
-      'events',
+      startDate,
+      endDate,
     );
-    const snapshot = await getDocs(
-      query(
-        eventsRef,
-        where('startTime', '<=', Timestamp.fromDate(endDate)),
-        orderBy('startTime'),
-      ),
-    );
-    const events = snapshot.docs
-      .map((docSnap) => {
-      const data = docSnap.data() as Omit<StoredEvent, 'startTime' | 'endTime'> & {
-        startTime: Timestamp;
-        endTime: Timestamp;
-      };
-      return {
-        ...data,
-        startTime: data.startTime.toDate(),
-        endTime: data.endTime.toDate(),
-      } as StoredEvent;
-    })
-      .filter((event) => event.endTime >= startDate);
+    const events = bucketEvents
+      .map((event) => ({
+        ...event,
+        startTime: event.startTime.toDate(),
+        endTime: event.endTime.toDate(),
+      }))
+      .filter((event) => event.endTime >= startDate) as StoredEvent[];
     return { data: events };
   },
 
