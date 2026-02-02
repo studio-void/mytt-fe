@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
+import { IconLock, IconShield, IconWorld } from '@tabler/icons-react';
 import { useNavigate, useParams } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
@@ -160,11 +161,26 @@ export function ViewSchedulePage() {
               <h1 className="text-2xl sm:text-3xl font-bold mb-1">
                 {schedule.userEmail}님의 일정
               </h1>
-              <p className="text-gray-600 text-sm">
-                {privacyLevel === 'busy_only' && '바쁜 시간만 표시됩니다'}
-                {privacyLevel === 'basic_info' && '기본 정보가 표시됩니다'}
-                {privacyLevel === 'full_details' && '전체 정보가 공개됩니다'}
-              </p>
+              <div className="flex items-center gap-2">
+                {privacyLevel === 'busy_only' && (
+                  <>
+                    <IconLock size={16} className="text-gray-600" />
+                    <p className="text-gray-600 text-sm">바쁜 시간 공개</p>
+                  </>
+                )}
+                {privacyLevel === 'basic_info' && (
+                  <>
+                    <IconShield size={16} className="text-gray-600" />
+                    <p className="text-gray-600 text-sm">기본 정보 공개</p>
+                  </>
+                )}
+                {privacyLevel === 'full_details' && (
+                  <>
+                    <IconWorld size={16} className="text-gray-600" />
+                    <p className="text-gray-600 text-sm">전체 공개</p>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
