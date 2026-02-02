@@ -284,7 +284,7 @@ export function CalendarPage() {
                         setCurrentDate(day);
                         setViewMode('day');
                       }}
-                      className={`min-h-24 border rounded-md p-2 text-left hover:border-gray-400 transition-colors ${
+                      className={`min-h-24 border rounded-md p-2 text-left hover:border-gray-400 transition-colors flex flex-col ${
                         isSameDay(day, today)
                           ? 'border-gray-900'
                           : 'border-gray-200'
@@ -293,11 +293,11 @@ export function CalendarPage() {
                       <span className="text-sm font-medium text-gray-700">
                         {day.getDate()}
                       </span>
-                      <div className="mt-1 space-y-1">
+                      <div className="mt-2 space-y-1">
                         {dayEvents.slice(0, 3).map((event) => (
                           <div
                             key={event.id}
-                            className="text-xs p-1 rounded truncate text-white"
+                            className="text-xs px-2 py-1 rounded-md truncate text-white shadow-sm"
                             style={{
                               backgroundColor: event.calendarColor || '#999999',
                             }}

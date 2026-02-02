@@ -428,7 +428,7 @@ export const meetingApi = {
       participants,
       availabilityDocs,
     );
-    return { data: { availabilitySlots } };
+    return { data: { availabilitySlots, availabilityDocs, participants } };
   },
 
   getMyAvailability: async (meetingId: string) => {

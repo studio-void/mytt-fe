@@ -45,6 +45,7 @@ interface SharedEvent {
   location?: string;
   isBusy: boolean;
   calendarTitle?: string;
+  calendarColor?: string;
 }
 
 const SHARE_LINKS_COLLECTION = 'shareLinks';
@@ -96,6 +97,7 @@ const mapEventForPrivacy = (
     endTime: Timestamp;
     isBusy: boolean;
     calendarTitle?: string;
+    calendarColor?: string;
   },
   privacyLevel: PrivacyLevel,
 ): SharedEvent => {
@@ -105,6 +107,8 @@ const mapEventForPrivacy = (
       startTime: event.startTime.toDate().toISOString(),
       endTime: event.endTime.toDate().toISOString(),
       isBusy: true,
+      calendarTitle: event.calendarTitle,
+      calendarColor: event.calendarColor,
     };
   }
 
@@ -116,6 +120,7 @@ const mapEventForPrivacy = (
       endTime: event.endTime.toDate().toISOString(),
       isBusy: event.isBusy,
       calendarTitle: event.calendarTitle,
+      calendarColor: event.calendarColor,
     };
   }
 
@@ -128,6 +133,7 @@ const mapEventForPrivacy = (
     endTime: event.endTime.toDate().toISOString(),
     isBusy: event.isBusy,
     calendarTitle: event.calendarTitle,
+    calendarColor: event.calendarColor,
   };
 };
 
@@ -175,6 +181,7 @@ const fetchOwnerEvents = async (ownerUid: string, start: Date, end: Date) => {
         endTime: Timestamp;
         isBusy: boolean;
         calendarTitle?: string;
+        calendarColor?: string;
       }),
     }))
     .filter((event) => event.endTime.toDate() >= start);
@@ -434,6 +441,10 @@ export const sharingApi = {
     }
     const linkDocId = buildShareLinkDocId(uid, normalizedLinkId);
 
+    const normalizedViewerEmail = viewerEmail
+      ? normalizeEmail(viewerEmail)
+      : null;
+
     let link: ShareLink | null = null;
     try {
       const linkSnap = await getDoc(doc(db, SHARE_LINKS_COLLECTION, linkDocId));
@@ -455,7 +466,8 @@ export const sharingApi = {
     }
 
     if (link.audience === 'restricted') {
-      if (!viewerEmail || !link.allowedEmails.includes(viewerEmail)) {
+      const allowedEmails = (link.allowedEmails ?? []).map(normalizeEmail);
+      if (!normalizedViewerEmail || !allowedEmails.includes(normalizedViewerEmail)) {
         return { error: 'access_denied', data: null };
       }
     }
@@ -495,6 +507,7 @@ export const sharingApi = {
           endTime: Timestamp;
           isBusy: boolean;
           calendarTitle?: string;
+          calendarColor?: string;
         }),
       }))
       .filter((event) => event.endTime.toDate() >= start)

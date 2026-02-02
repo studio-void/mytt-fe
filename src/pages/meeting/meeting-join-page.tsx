@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { useNavigate, useParams } from '@tanstack/react-router';
 import { toast } from 'sonner';
@@ -22,6 +22,17 @@ interface TimeBlock {
   endTime: string;
 }
 
+interface AvailabilityDoc {
+  uid: string;
+  busyBlocks: TimeBlock[];
+  manualBlocks: TimeBlock[];
+}
+
+interface ParticipantInfo {
+  uid: string;
+  email: string | null;
+}
+
 export function MeetingJoinPage() {
   const { inviteCode } = useParams({ strict: false });
   const navigate = useNavigate();
@@ -33,10 +44,18 @@ export function MeetingJoinPage() {
   const [meeting, setMeeting] = useState<any>(null);
   const [participants, setParticipants] = useState<any[]>([]);
   const [availabilitySlots, setAvailabilitySlots] = useState<TimeSlot[]>([]);
+  const [availabilityDocs, setAvailabilityDocs] = useState<AvailabilityDoc[]>([]);
   const [hasJoined, setHasJoined] = useState(false);
   const [manualBlocks, setManualBlocks] = useState<TimeBlock[]>([]);
-  const [blockStart, setBlockStart] = useState('');
-  const [blockEnd, setBlockEnd] = useState('');
+  const [weekStart, setWeekStart] = useState<Date | null>(null);
+  const [blockedSlots, setBlockedSlots] = useState<Set<string>>(new Set());
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragMode, setDragMode] = useState<'add' | 'remove'>('add');
+  const [hoveredAvailability, setHoveredAvailability] = useState<{
+    slot: TimeSlot;
+    x: number;
+    y: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!inviteCode) {
@@ -47,6 +66,12 @@ export function MeetingJoinPage() {
 
     loadMeetingData();
   }, [inviteCode, isAuthenticated]);
+
+  useEffect(() => {
+    const stopDragging = () => setIsDragging(false);
+    window.addEventListener('pointerup', stopDragging);
+    return () => window.removeEventListener('pointerup', stopDragging);
+  }, []);
 
   const loadMeetingData = async () => {
     try {
@@ -80,6 +105,7 @@ export function MeetingJoinPage() {
           inviteCode!,
         );
         setAvailabilitySlots(availabilityResponse.data.availabilitySlots);
+        setAvailabilityDocs(availabilityResponse.data.availabilityDocs ?? []);
 
         if (joined && meetingResponse.data?.id) {
           const myAvailability = await meetingApi.getMyAvailability(
@@ -145,46 +171,22 @@ export function MeetingJoinPage() {
     toast.success('초대 링크가 복사되었습니다!');
   };
 
-  const handleAddBlock = () => {
-    if (!blockStart || !blockEnd) {
-      toast.error('시작/종료 시간을 선택해주세요.');
-      return;
-    }
-    const start = new Date(blockStart);
-    const end = new Date(blockEnd);
-    if (end <= start) {
-      toast.error('종료 시간이 시작 시간보다 늦어야 합니다.');
-      return;
-    }
-    if (meeting) {
-      const meetingStart = new Date(meeting.startTime);
-      const meetingEnd = new Date(meeting.endTime);
-      if (start < meetingStart || end > meetingEnd) {
-        toast.error('선택한 시간은 약속 범위 안에 있어야 합니다.');
-        return;
-      }
-    }
-    setManualBlocks((prev) => [
-      ...prev,
-      { startTime: start.toISOString(), endTime: end.toISOString() },
-    ]);
-    setBlockStart('');
-    setBlockEnd('');
-  };
-
   const handleRemoveBlock = (index: number) => {
-    setManualBlocks((prev) => prev.filter((_, idx) => idx !== index));
+    if (!meetingRange) return;
+    const nextBlocks = derivedBlocks.filter((_, idx) => idx !== index);
+    setBlockedSlots(buildSlotsFromBlocks(nextBlocks, meetingRange));
   };
 
   const handleSaveBlocks = async () => {
     if (!meeting?.id) return;
     try {
       setSavingBlocks(true);
-      await meetingApi.updateManualBlocks(meeting.id, manualBlocks);
+      await meetingApi.updateManualBlocks(meeting.id, derivedBlocks);
       const availabilityResponse = await meetingApi.getMeetingAvailability(
         inviteCode!,
       );
       setAvailabilitySlots(availabilityResponse.data.availabilitySlots);
+      setAvailabilityDocs(availabilityResponse.data.availabilityDocs ?? []);
       toast.success('차단 시간이 저장되었습니다.');
     } catch (error) {
       console.error('Error saving blocks:', error);
@@ -209,6 +211,74 @@ export function MeetingJoinPage() {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
+    });
+  };
+
+  const meetingRange = useMemo(
+    () => (meeting ? getMeetingRange(meeting.startTime, meeting.endTime) : null),
+    [meeting],
+  );
+
+  const weekDays = useMemo(() => {
+    if (!weekStart) return [];
+    return buildWeekDays(weekStart);
+  }, [weekStart]);
+
+  const availabilitySlotMap = useMemo(() => {
+    const map = new Map<number, TimeSlot>();
+    availabilitySlots.forEach((slot) => {
+      const key = new Date(slot.startTime).getTime();
+      map.set(key, slot);
+    });
+    return map;
+  }, [availabilitySlots]);
+
+  const availabilityDocsMap = useMemo(() => {
+    const map = new Map<string, AvailabilityDoc>();
+    availabilityDocs.forEach((doc) => map.set(doc.uid, doc));
+    return map;
+  }, [availabilityDocs]);
+
+  const participantList = useMemo(
+    () =>
+      participants
+        .map((participant: ParticipantInfo) => ({
+          uid: participant.uid,
+          email: participant.email ?? '알 수 없음',
+        }))
+        .filter((participant) => participant.uid),
+    [participants],
+  );
+
+  const availabilityWeekDays = useMemo(() => {
+    if (!weekStart) return [];
+    return buildWeekDays(weekStart);
+  }, [weekStart]);
+
+  const derivedBlocks = useMemo(
+    () => buildBlocksFromSlots(blockedSlots, meetingRange),
+    [blockedSlots, meetingRange],
+  );
+
+  useEffect(() => {
+    if (!meetingRange) return;
+    setWeekStart((prev) => prev ?? startOfWeek(meetingRange.start));
+  }, [meetingRange]);
+
+  useEffect(() => {
+    if (!meetingRange) return;
+    setBlockedSlots(buildSlotsFromBlocks(manualBlocks, meetingRange));
+  }, [manualBlocks, meetingRange]);
+
+  const handleToggleSlot = (slotId: string, action: 'add' | 'remove') => {
+    setBlockedSlots((prev) => {
+      const next = new Set(prev);
+      if (action === 'add') {
+        next.add(slotId);
+      } else {
+        next.delete(slotId);
+      }
+      return next;
     });
   };
 
@@ -292,91 +362,194 @@ export function MeetingJoinPage() {
         {isAuthenticated && availabilitySlots.length > 0 && (
           <div className="border border-gray-200 rounded-lg p-8">
             <h2 className="text-2xl font-bold mb-6">최적의 시간 찾기</h2>
-
-            {/* 최적 시간대 추천 */}
-            <div className="mb-6 p-4 border border-gray-200 rounded-lg">
-              <h3 className="font-semibold text-gray-900 mb-2">
-                ⭐ 추천 시간대 (모든 참가자가 가능한 시간)
-              </h3>
-              <div className="space-y-2">
-                {availabilitySlots
-                  .filter((slot) => slot.isOptimal)
-                  .slice(0, 5)
-                  .map((slot, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-3 border border-gray-200 rounded"
+            {meetingRange && weekStart && (
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-sm text-gray-600">
+                    파란색이 진할수록 더 많은 참가자가 가능한 시간입니다.
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      type="button"
+                      onClick={() =>
+                        setWeekStart((prev) =>
+                          prev
+                            ? getPreviousWeek(prev, meetingRange.start)
+                            : startOfWeek(meetingRange.start),
+                        )
+                      }
+                      disabled={!canMoveToPrevWeek(weekStart, meetingRange.start)}
                     >
-                      <span className="font-medium">
-                        {formatDate(slot.startTime)}{' '}
-                        {formatTime(slot.startTime)} -{' '}
-                        {formatTime(slot.endTime)}
-                      </span>
-                      <span className="text-green-600 font-semibold">
-                        ✓ 모두 가능
-                      </span>
+                      이전 주
+                    </Button>
+                    <Button
+                      variant="outline"
+                      type="button"
+                      onClick={() =>
+                        setWeekStart((prev) =>
+                          prev
+                            ? getNextWeek(prev, meetingRange.end)
+                            : startOfWeek(meetingRange.start),
+                        )
+                      }
+                      disabled={!canMoveToNextWeek(weekStart, meetingRange.end)}
+                    >
+                      다음 주
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="grid grid-cols-[64px_repeat(7,1fr)] bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-600">
+                    <div className="p-2">시간</div>
+                    {availabilityWeekDays.map((day) => (
+                      <div key={day.toISOString()} className="p-2 text-center">
+                        {day.toLocaleDateString('ko-KR', {
+                          month: 'short',
+                          day: 'numeric',
+                          weekday: 'short',
+                        })}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-[64px_repeat(7,1fr)]">
+                    <div>
+                      {AVAIL_HOUR_LABELS.map((label, index) => (
+                        <div
+                          key={`avail-label-${index}`}
+                          className="text-xs text-gray-400 px-2"
+                          style={{ height: AVAIL_SLOT_HEIGHT * 2 }}
+                        >
+                          {label}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                {availabilitySlots.filter((slot) => slot.isOptimal).length ===
-                  0 && (
-                  <p className="text-gray-500">
-                    모든 참가자가 가능한 시간이 없습니다.
-                  </p>
+                    {availabilityWeekDays.map((day) => (
+                      <div key={day.toISOString()} className="border-l border-gray-100">
+                        {AVAIL_TIME_SLOTS.map((slotMinutes) => {
+                          const slotStart = addMinutes(day, slotMinutes);
+                          const slotEnd = addMinutes(slotStart, AVAIL_SLOT_MINUTES);
+                          const inRange =
+                            slotStart >= meetingRange.start &&
+                            slotEnd <= meetingRange.end;
+                          const slotKey = slotStart.getTime();
+                          const slot = availabilitySlotMap.get(slotKey);
+                          const availability = slot?.availability ?? 0;
+                          const availabilityPercent = Math.round(availability * 100);
+                          const bgColor = inRange
+                            ? getAvailabilityColor(availability)
+                            : '#f8fafc';
+                          const isOptimal = slot?.isOptimal;
+
+                          return (
+                            <div
+                              key={`${day.toISOString()}-${slotMinutes}`}
+                              className="border-t border-gray-100 relative"
+                              style={{ height: AVAIL_SLOT_HEIGHT, backgroundColor: bgColor }}
+                              title={
+                                inRange && slot
+                                  ? `${availabilityPercent}% (${slot.availableCount}/${participants.length})`
+                                  : ''
+                              }
+                              onMouseEnter={(event) => {
+                                if (!inRange || !slot) return;
+                                setHoveredAvailability({
+                                  slot,
+                                  x: event.clientX,
+                                  y: event.clientY,
+                                });
+                              }}
+                              onMouseLeave={() => setHoveredAvailability(null)}
+                            >
+                              {isOptimal && (
+                                <div className="absolute inset-0 border border-blue-500/40" />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {hoveredAvailability && (
+                  <div
+                    className="fixed z-50 w-64 rounded-lg border border-gray-200 bg-white p-3 text-xs shadow-lg"
+                    style={{
+                      top: hoveredAvailability.y + 12,
+                      left: hoveredAvailability.x + 12,
+                    }}
+                  >
+                    <div className="font-semibold text-gray-800 mb-2">
+                      {formatDate(hoveredAvailability.slot.startTime)}{' '}
+                      {formatTime(hoveredAvailability.slot.startTime)} -{' '}
+                      {formatTime(hoveredAvailability.slot.endTime)}
+                    </div>
+                    <div className="text-[11px] text-gray-500 mb-2">
+                      {Math.round(hoveredAvailability.slot.availability * 100)}% 가능 (
+                      {hoveredAvailability.slot.availableCount}/{participants.length})
+                    </div>
+                    <div className="space-y-2">
+                      {(() => {
+                        const availability = getSlotAvailabilityDetails(
+                          hoveredAvailability.slot.startTime,
+                          hoveredAvailability.slot.endTime,
+                          participantList,
+                          availabilityDocsMap,
+                        );
+                        return (
+                          <>
+                            <div>
+                              <div className="font-semibold text-gray-700 mb-1">
+                                가능
+                              </div>
+                              {availability.available.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {availability.available.map((email) => (
+                                    <span
+                                      key={email}
+                                      className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] text-blue-700"
+                                    >
+                                      {email}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-[11px] text-gray-400">
+                                  없음
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-gray-700 mb-1">
+                                불가
+                              </div>
+                              {availability.unavailable.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {availability.unavailable.map((email) => (
+                                    <span
+                                      key={email}
+                                      className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600"
+                                    >
+                                      {email}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-[11px] text-gray-400">
+                                  없음
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
                 )}
               </div>
-            </div>
-
-            {/* 시간대별 가용성 */}
-            <div>
-              <h3 className="font-semibold mb-4">시간대별 가용성</h3>
-              <div className="space-y-2">
-                {availabilitySlots.slice(0, 20).map((slot, index) => {
-                  const availabilityPercent = Math.round(
-                    slot.availability * 100,
-                  );
-                  let bgColor = 'bg-red-50';
-                  let textColor = 'text-red-700';
-                  let barColor = 'bg-red-500';
-
-                  if (availabilityPercent === 100) {
-                    bgColor = 'bg-green-50';
-                    textColor = 'text-green-700';
-                    barColor = 'bg-green-500';
-                  } else if (availabilityPercent >= 70) {
-                    bgColor = 'bg-yellow-50';
-                    textColor = 'text-yellow-700';
-                    barColor = 'bg-yellow-500';
-                  }
-
-                  return (
-                    <div
-                      key={index}
-                      className={`flex items-center justify-between p-3 rounded border border-gray-200 ${bgColor}`}
-                    >
-                      <span className="font-medium text-sm">
-                        {formatDate(slot.startTime)}{' '}
-                        {formatTime(slot.startTime)} -{' '}
-                        {formatTime(slot.endTime)}
-                      </span>
-                      <div className="flex items-center gap-4">
-                        <span className={`text-sm ${textColor}`}>
-                          {slot.availableCount}/{participants.length}명 가능
-                        </span>
-                        <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
-                          <div
-                            className={barColor}
-                            style={{ width: `${availabilityPercent}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-semibold text-gray-600 w-10">
-                          {availabilityPercent}%
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -386,66 +559,154 @@ export function MeetingJoinPage() {
             <p className="text-sm text-gray-600 mb-4">
               Google 캘린더에 없는 일정도 직접 차단할 수 있습니다.
             </p>
-            <div className="grid md:grid-cols-3 gap-4 items-end">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  시작 시간
-                </label>
-                <input
-                  type="datetime-local"
-                  value={blockStart}
-                  onChange={(e) => setBlockStart(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-md"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  종료 시간
-                </label>
-                <input
-                  type="datetime-local"
-                  value={blockEnd}
-                  onChange={(e) => setBlockEnd(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-md"
-                />
-              </div>
-              <Button onClick={handleAddBlock} type="button">
-                차단 시간 추가
-              </Button>
-            </div>
-
-            <div className="mt-6 space-y-2">
-              {manualBlocks.length > 0 ? (
-                manualBlocks.map((block, index) => (
-                  <div
-                    key={`${block.startTime}-${index}`}
-                    className="flex items-center justify-between p-3 border border-gray-200 rounded"
-                  >
-                    <span className="text-sm">
-                      {formatDate(block.startTime)}{' '}
-                      {formatTime(block.startTime)} -{' '}
-                      {formatTime(block.endTime)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveBlock(index)}
-                      className="text-sm text-gray-500 hover:text-gray-800"
-                    >
-                      삭제
-                    </button>
+            {meetingRange && (
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-sm text-gray-600">
+                    15분 단위로 드래그하여 차단 시간을 선택하세요.
                   </div>
-                ))
-              ) : (
-                <p className="text-sm text-gray-500">
-                  등록된 차단 시간이 없습니다.
-                </p>
-              )}
-              <div className="pt-4">
-                <Button onClick={handleSaveBlocks} disabled={savingBlocks}>
-                  {savingBlocks ? '저장 중...' : '차단 시간 저장'}
-                </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      type="button"
+                      onClick={() =>
+                        setWeekStart((prev) =>
+                          prev
+                            ? getPreviousWeek(prev, meetingRange.start)
+                            : startOfWeek(meetingRange.start),
+                        )
+                      }
+                      disabled={!weekStart || !canMoveToPrevWeek(weekStart, meetingRange.start)}
+                    >
+                      이전 주
+                    </Button>
+                    <Button
+                      variant="outline"
+                      type="button"
+                      onClick={() =>
+                        setWeekStart((prev) =>
+                          prev
+                            ? getNextWeek(prev, meetingRange.end)
+                            : startOfWeek(meetingRange.start),
+                        )
+                      }
+                      disabled={!weekStart || !canMoveToNextWeek(weekStart, meetingRange.end)}
+                    >
+                      다음 주
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="grid grid-cols-[64px_repeat(7,1fr)] bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-600">
+                    <div className="p-2">시간</div>
+                    {weekDays.map((day) => (
+                      <div key={day.toISOString()} className="p-2 text-center">
+                        {day.toLocaleDateString('ko-KR', {
+                          month: 'short',
+                          day: 'numeric',
+                          weekday: 'short',
+                        })}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div
+                    className="grid grid-cols-[64px_repeat(7,1fr)]"
+                    onPointerUp={() => setIsDragging(false)}
+                  >
+                    <div>
+                      {HOUR_LABELS.map((label, index) => (
+                        <div
+                          key={`label-${index}`}
+                          className="text-xs text-gray-400 px-2"
+                          style={{ height: SLOT_HEIGHT * 4 }}
+                        >
+                          {label}
+                        </div>
+                      ))}
+                    </div>
+                    {weekDays.map((day) => {
+                      const dayKey = day.toISOString();
+                      return (
+                        <div key={dayKey} className="border-l border-gray-100">
+                          {TIME_SLOTS.map((slotMinutes) => {
+                            const slotStart = addMinutes(day, slotMinutes);
+                            const slotEnd = addMinutes(slotStart, 15);
+                            const inRange =
+                              slotStart >= meetingRange.start &&
+                              slotEnd <= meetingRange.end;
+                            const slotId = slotStart.toISOString();
+                            const isBlocked = blockedSlots.has(slotId);
+
+                            return (
+                              <div
+                                key={slotId}
+                                role="button"
+                                tabIndex={-1}
+                                className={`border-t border-gray-100 ${
+                                  inRange
+                                    ? isBlocked
+                                      ? 'bg-red-400'
+                                      : 'bg-white hover:bg-red-100'
+                                    : 'bg-gray-50'
+                                }`}
+                                style={{ height: SLOT_HEIGHT }}
+                                onPointerDown={(event) => {
+                                  if (!inRange) return;
+                                  event.preventDefault();
+                                  const nextMode = isBlocked ? 'remove' : 'add';
+                                  setDragMode(nextMode);
+                                  setIsDragging(true);
+                                  handleToggleSlot(slotId, nextMode);
+                                }}
+                                onPointerEnter={() => {
+                                  if (!isDragging || !inRange) return;
+                                  handleToggleSlot(slotId, dragMode);
+                                }}
+                              />
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  {derivedBlocks.length > 0 ? (
+                    derivedBlocks.map((block, index) => (
+                      <div
+                        key={`${block.startTime}-${index}`}
+                        className="flex items-center justify-between p-3 border border-gray-200 rounded"
+                      >
+                        <span className="text-sm">
+                          {formatDate(block.startTime)}{' '}
+                          {formatTime(block.startTime)} -{' '}
+                          {formatTime(block.endTime)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveBlock(index)}
+                          className="text-sm text-gray-500 hover:text-gray-800"
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-500">
+                      등록된 차단 시간이 없습니다.
+                    </p>
+                  )}
+                  <div className="pt-4">
+                    <Button onClick={handleSaveBlocks} disabled={savingBlocks}>
+                      {savingBlocks ? '저장 중...' : '차단 시간 저장'}
+                    </Button>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -463,3 +724,194 @@ export function MeetingJoinPage() {
     </Layout>
   );
 }
+
+const SLOT_HEIGHT = 16;
+const SLOT_MINUTES = 15;
+const TIME_SLOTS = Array.from({ length: 96 }, (_, index) => index * SLOT_MINUTES);
+const HOUR_LABELS = Array.from({ length: 24 }, (_, index) => `${index}:00`);
+const AVAIL_SLOT_MINUTES = 30;
+const AVAIL_SLOT_HEIGHT = 14;
+const AVAIL_TIME_SLOTS = Array.from(
+  { length: 48 },
+  (_, index) => index * AVAIL_SLOT_MINUTES,
+);
+const AVAIL_HOUR_LABELS = Array.from({ length: 24 }, (_, index) => `${index}:00`);
+
+const startOfDay = (date: Date) =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+
+const endOfDay = (date: Date) =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+
+const addMinutes = (date: Date, minutes: number) => {
+  const next = new Date(date);
+  next.setMinutes(next.getMinutes() + minutes);
+  return next;
+};
+
+const startOfWeek = (date: Date) => {
+  const start = startOfDay(date);
+  start.setDate(start.getDate() - start.getDay());
+  return start;
+};
+
+const buildWeekDays = (weekStart: Date) =>
+  Array.from({ length: 7 }, (_, index) => {
+    const next = new Date(weekStart);
+    next.setDate(weekStart.getDate() + index);
+    return next;
+  });
+
+const getMeetingRange = (startTime: string, endTime: string) => {
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  return {
+    start,
+    end,
+    startDay: startOfDay(start),
+    endDay: endOfDay(end),
+  };
+};
+
+const buildSlotsFromBlocks = (
+  blocks: TimeBlock[],
+  meetingRange: ReturnType<typeof getMeetingRange> | null,
+) => {
+  const next = new Set<string>();
+  if (!meetingRange) return next;
+  const rangeStart = meetingRange.start;
+  const rangeEnd = meetingRange.end;
+
+  blocks.forEach((block) => {
+    let cursor = new Date(block.startTime);
+    const blockEnd = new Date(block.endTime);
+    while (cursor < blockEnd) {
+      const slotStart = new Date(cursor);
+      const slotEnd = addMinutes(slotStart, SLOT_MINUTES);
+      if (slotStart >= rangeStart && slotEnd <= rangeEnd) {
+        next.add(slotStart.toISOString());
+      }
+      cursor = slotEnd;
+    }
+  });
+
+  return next;
+};
+
+const buildBlocksFromSlots = (
+  slots: Set<string>,
+  meetingRange: ReturnType<typeof getMeetingRange> | null,
+) => {
+  if (!meetingRange) return [];
+  const sorted = Array.from(slots)
+    .map((value) => new Date(value))
+    .sort((a, b) => a.getTime() - b.getTime());
+
+  const blocks: TimeBlock[] = [];
+  let currentStart: Date | null = null;
+  let currentEnd: Date | null = null;
+
+  sorted.forEach((slotStart) => {
+    const slotEnd = addMinutes(slotStart, SLOT_MINUTES);
+    if (!currentStart) {
+      currentStart = slotStart;
+      currentEnd = slotEnd;
+      return;
+    }
+    if (slotStart.getTime() === currentEnd?.getTime()) {
+      currentEnd = slotEnd;
+    } else {
+      blocks.push({
+        startTime: currentStart.toISOString(),
+        endTime: currentEnd!.toISOString(),
+      });
+      currentStart = slotStart;
+      currentEnd = slotEnd;
+    }
+  });
+
+  if (currentStart && currentEnd) {
+    blocks.push({
+      startTime: currentStart.toISOString(),
+      endTime: currentEnd.toISOString(),
+    });
+  }
+
+  return blocks;
+};
+
+const canMoveToPrevWeek = (weekStart: Date, rangeStart: Date) =>
+  startOfWeek(weekStart).getTime() > startOfWeek(rangeStart).getTime();
+
+const canMoveToNextWeek = (weekStart: Date, rangeEnd: Date) => {
+  const nextWeekStart = new Date(weekStart);
+  nextWeekStart.setDate(nextWeekStart.getDate() + 7);
+  return nextWeekStart.getTime() <= startOfWeek(rangeEnd).getTime();
+};
+
+const getPreviousWeek = (weekStart: Date, rangeStart: Date) => {
+  const prev = new Date(weekStart);
+  prev.setDate(prev.getDate() - 7);
+  const min = startOfWeek(rangeStart);
+  return prev < min ? min : prev;
+};
+
+const getNextWeek = (weekStart: Date, rangeEnd: Date) => {
+  const next = new Date(weekStart);
+  next.setDate(next.getDate() + 7);
+  const max = startOfWeek(rangeEnd);
+  return next > max ? max : next;
+};
+
+const getAvailabilityColor = (availability: number) => {
+  if (availability <= 0) return '#f8fafc';
+  const clamped = Math.min(1, Math.max(0, availability));
+  const lightness = 94 - clamped * 22;
+  return `hsl(210, 85%, ${lightness}%)`;
+};
+
+const getSlotAvailabilityDetails = (
+  startTime: string,
+  endTime: string,
+  participants: Array<{ uid: string; email: string }>,
+  availabilityDocs: Map<string, AvailabilityDoc>,
+) => {
+  const slotStart = new Date(startTime);
+  const slotEnd = new Date(endTime);
+  const available: string[] = [];
+  const unavailable: string[] = [];
+
+  participants.forEach((participant) => {
+    const doc = availabilityDocs.get(participant.uid);
+    if (!doc) {
+      unavailable.push(participant.email);
+      return;
+    }
+    const isBusy = doc.busyBlocks.some((block) =>
+      blocksOverlap(slotStart, slotEnd, block),
+    );
+    if (isBusy) {
+      unavailable.push(participant.email);
+    } else {
+      available.push(participant.email);
+    }
+  });
+
+  return { available, unavailable };
+};
+
+const normalizeBlock = (block: TimeBlock) => {
+  const start = new Date(block.startTime);
+  const end = new Date(block.endTime);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return null;
+  }
+  if (end <= start) return null;
+  return { start, end };
+};
+
+const blocksOverlap = (start: Date, end: Date, block: TimeBlock) => {
+  const normalized = normalizeBlock(block);
+  if (!normalized) return false;
+  return normalized.start < end && normalized.end > start;
+};

@@ -36,12 +36,12 @@ export const Header = forwardRef<
 
           {isAuthenticated && (
             <>
-              <Link
+              {/* <Link
                 to="/dashboard"
                 className="text-gray-600 hover:text-gray-900 font-medium"
               >
                 대시보드
-              </Link>
+              </Link> */}
               <Link
                 to="/schedule/calendar"
                 className="text-gray-600 hover:text-gray-900 font-medium"
