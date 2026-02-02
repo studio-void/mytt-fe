@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { useNavigate } from '@tanstack/react-router';
+import { IconCalendar, IconLink } from '@tabler/icons-react';
 import { toast } from 'sonner';
 
 import { Layout } from '@/components';
@@ -185,17 +186,20 @@ export function ShareSchedulePage() {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">일정 공유</h1>
-          <p className="text-gray-600">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold mb-2">일정 공유</h1>
+          <p className="text-gray-600 text-sm sm:text-base">
             여러 개의 공유 링크를 만들고 각 링크별로 공개 범위를 설정하세요.
           </p>
         </div>
 
-        <div className="border border-gray-200 rounded-lg p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">📅 캘린더 동기화</h2>
-          <p className="text-gray-600 mb-4">
+        <div className="border border-gray-200 rounded-lg p-4 sm:p-6 mb-6">
+          <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center gap-2">
+            <IconCalendar size={22} stroke={1.8} className="text-gray-700" />
+            <span>캘린더 동기화</span>
+          </h2>
+          <p className="text-gray-600 mb-4 text-sm sm:text-base">
             Google Calendar와 동기화하여 최신 일정을 불러옵니다
           </p>
           <Button onClick={handleSyncCalendar} disabled={syncing}>
@@ -203,8 +207,8 @@ export function ShareSchedulePage() {
           </Button>
         </div>
 
-        <div className="border border-gray-200 rounded-lg p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">
+        <div className="border border-gray-200 rounded-lg p-4 sm:p-6 mb-6">
+          <h2 className="text-lg sm:text-xl font-semibold mb-4">
             {editingLinkId ? '공유 링크 수정' : '새 공유 링크 만들기'}
           </h2>
 
@@ -343,8 +347,11 @@ export function ShareSchedulePage() {
           </div>
         </div>
 
-        <div className="border border-gray-200 rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">🔗 내 공유 링크</h2>
+        <div className="border border-gray-200 rounded-lg p-4 sm:p-6">
+          <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center gap-2">
+            <IconLink size={22} stroke={1.8} className="text-gray-700" />
+            <span>내 공유 링크</span>
+          </h2>
           {linkList.length === 0 ? (
             <p className="text-gray-500">등록된 공유 링크가 없습니다.</p>
           ) : (

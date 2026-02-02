@@ -1,6 +1,12 @@
 import { useEffect } from 'react';
 
 import { useNavigate } from '@tanstack/react-router';
+import {
+  IconCalendar,
+  IconCalendarEvent,
+  IconLink,
+  IconMail,
+} from '@tabler/icons-react';
 
 import { Layout } from '@/components';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -29,19 +35,23 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <Layout>
-      <div className="max-w-5xl mx-auto py-20">
-        <div className="text-center mb-16">
-          <h1 className="text-4xl font-bold mb-2">대시보드</h1>
-          <p className="text-gray-600 text-lg">원하는 기능을 선택하세요</p>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+        <div className="text-center mb-10 sm:mb-16">
+          <h1 className="text-3xl sm:text-4xl font-bold mb-2">대시보드</h1>
+          <p className="text-gray-600 text-base sm:text-lg">
+            원하는 기능을 선택하세요
+          </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
           <button
             onClick={handleMeeting}
-            className="p-8 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors text-left group"
+            className="p-5 sm:p-8 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors text-left group"
           >
-            <div className="text-4xl mb-4">📅</div>
-            <h3 className="text-xl font-semibold mb-3 group-hover:text-gray-900">
+            <div className="mb-4 text-gray-800">
+              <IconCalendarEvent size={40} stroke={1.7} />
+            </div>
+            <h3 className="text-lg sm:text-xl font-semibold mb-3 group-hover:text-gray-900">
               약속 잡기
             </h3>
             <p className="text-gray-600 text-sm leading-relaxed">
@@ -51,10 +61,12 @@ export const DashboardPage: React.FC = () => {
 
           <button
             onClick={handleShareSchedule}
-            className="p-8 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors text-left group"
+            className="p-5 sm:p-8 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors text-left group"
           >
-            <div className="text-4xl mb-4">🔗</div>
-            <h3 className="text-xl font-semibold mb-3 group-hover:text-gray-900">
+            <div className="mb-4 text-gray-800">
+              <IconLink size={40} stroke={1.7} />
+            </div>
+            <h3 className="text-lg sm:text-xl font-semibold mb-3 group-hover:text-gray-900">
               일정 공유
             </h3>
             <p className="text-gray-600 text-sm leading-relaxed">
@@ -64,10 +76,12 @@ export const DashboardPage: React.FC = () => {
 
           <button
             onClick={handleViewCalendar}
-            className="p-8 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors text-left group"
+            className="p-5 sm:p-8 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors text-left group"
           >
-            <div className="text-4xl mb-4">📆</div>
-            <h3 className="text-xl font-semibold mb-3 group-hover:text-gray-900">
+            <div className="mb-4 text-gray-800">
+              <IconCalendar size={40} stroke={1.7} />
+            </div>
+            <h3 className="text-lg sm:text-xl font-semibold mb-3 group-hover:text-gray-900">
               내 캘린더
             </h3>
             <p className="text-gray-600 text-sm leading-relaxed">
@@ -77,10 +91,12 @@ export const DashboardPage: React.FC = () => {
 
           <button
             onClick={() => navigate({ to: '/meeting/join' })}
-            className="p-8 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors text-left group"
+            className="p-5 sm:p-8 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors text-left group"
           >
-            <div className="text-4xl mb-4">✉️</div>
-            <h3 className="text-xl font-semibold mb-3 group-hover:text-gray-900">
+            <div className="mb-4 text-gray-800">
+              <IconMail size={40} stroke={1.7} />
+            </div>
+            <h3 className="text-lg sm:text-xl font-semibold mb-3 group-hover:text-gray-900">
               약속 참여
             </h3>
             <p className="text-gray-600 text-sm leading-relaxed">
