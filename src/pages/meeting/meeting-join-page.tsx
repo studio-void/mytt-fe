@@ -150,6 +150,9 @@ export function MeetingJoinPage() {
         setJoining(false);
         return;
       }
+      if (syncResponse.data?.skipped) {
+        toast.message('동기화가 너무 빈번해 잠시 건너뛰었습니다.');
+      }
 
       // 미팅 참여
       await meetingApi.joinMeetingByCode(inviteCode!);

@@ -19,8 +19,9 @@ import { auth, db } from '@/services/firebase';
 import { authApi } from './authApi';
 
 const GOOGLE_CALENDAR_BASE = 'https://www.googleapis.com/calendar/v3';
-const DEFAULT_RANGE_MONTHS = 3;
+const DEFAULT_RANGE_MONTHS = 2;
 const MAX_BATCH_SIZE = 450;
+const SYNC_COOLDOWN_MINUTES = 30;
 
 interface GoogleCalendarListItem {
   id: string;
@@ -190,6 +191,25 @@ export const calendarApi = {
     try {
       if (!auth.currentUser) {
         return { error: '로그인이 필요합니다.' };
+      }
+      const userRef = doc(db, 'users', auth.currentUser.uid);
+      const userSnap = await getDoc(userRef);
+      const lastSyncedAt = userSnap.exists()
+        ? (userSnap.data()?.calendarSync?.updatedAt as Timestamp | undefined)
+        : undefined;
+      if (lastSyncedAt) {
+        const lastSyncMs = lastSyncedAt.toMillis();
+        const cooldownMs = SYNC_COOLDOWN_MINUTES * 60 * 1000;
+        if (Date.now() - lastSyncMs < cooldownMs) {
+          return {
+            data: {
+              skipped: true,
+              reason: 'cooldown',
+              lastSyncedAt: lastSyncedAt.toDate(),
+              nextSyncAt: new Date(lastSyncMs + cooldownMs),
+            },
+          };
+        }
       }
       const token = await authApi.getGoogleAccessToken();
       const { start, end } = getRange(startDate, endDate);

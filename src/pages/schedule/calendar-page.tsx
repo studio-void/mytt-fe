@@ -110,7 +110,11 @@ export function CalendarPage() {
         return;
       }
 
-      toast.success('캘린더가 동기화되었습니다.');
+      if (response.data?.skipped) {
+        toast.message('동기화가 너무 빈번해 잠시 건너뛰었습니다.');
+      } else {
+        toast.success('캘린더가 동기화되었습니다.');
+      }
 
       // 동기화 후 캘린더와 이벤트 다시 로드
       await loadCalendars();

@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { authApi } from '@/services/api/authApi';
-import { calendarApi } from '@/services/api/calendarApi';
 
 export function GoogleLoginButton() {
   const [loading, setLoading] = useState(false);
@@ -13,7 +12,6 @@ export function GoogleLoginButton() {
     setLoading(true);
     try {
       await authApi.googleLogin();
-      await calendarApi.syncCalendar();
     } catch (error) {
       console.error('Google login failed:', error);
       toast.error('Google 로그인에 실패했습니다.');

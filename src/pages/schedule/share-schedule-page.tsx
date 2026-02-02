@@ -79,8 +79,11 @@ export function ShareSchedulePage() {
         return;
       }
 
-      await sharingApi.refreshShareLinksForOwner();
       await loadLinks();
+      if (response.data?.skipped) {
+        toast.message('동기화가 너무 빈번해 잠시 건너뛰었습니다.');
+        return;
+      }
       toast.success('캘린더가 동기화되었습니다!');
     } catch (error) {
       console.error('Error syncing calendar:', error);
