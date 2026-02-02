@@ -27,9 +27,11 @@ export const Layout: React.FC<
       <Header ref={headerRef} />
       <main
         style={{ paddingTop: disableHeaderHeight ? 0 : headerHeight }}
-        className="px-4 sm:px-6 lg:px-8"
+        className="w-full"
       >
-        {children}
+        <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+          {children}
+        </div>
       </main>
       <Footer />
     </div>

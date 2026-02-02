@@ -176,7 +176,7 @@ export function CalendarPage() {
 
   return (
     <Layout>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-6xl mx-auto py-8">
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <h1 className="text-2xl sm:text-3xl font-bold">일정 관리</h1>
@@ -251,7 +251,7 @@ export function CalendarPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* 캘린더 */}
-          <div className="lg:col-span-2 rounded-lg p-4 sm:p-6">
+          <div className="lg:col-span-2 rounded-lg">
             {viewMode === 'month' && (
               <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
                 {['일', '월', '화', '수', '목', '금', '토'].map((day) => (

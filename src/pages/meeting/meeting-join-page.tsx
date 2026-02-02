@@ -288,7 +288,7 @@ export function MeetingJoinPage() {
   if (loading) {
     return (
       <Layout>
-        <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="max-w-6xl mx-auto py-8">
           <div className="text-center">로딩 중...</div>
         </div>
       </Layout>
@@ -298,7 +298,7 @@ export function MeetingJoinPage() {
   if (!meeting) {
     return (
       <Layout>
-        <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="max-w-6xl mx-auto py-8">
           <div className="text-center">약속을 찾을 수 없습니다.</div>
         </div>
       </Layout>
@@ -307,7 +307,7 @@ export function MeetingJoinPage() {
 
   return (
     <Layout>
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto py-8">
         {/* 미팅 정보 */}
         <div className="border border-gray-200 rounded-lg p-8 mb-6">
           <div className="flex justify-between items-start mb-4">
