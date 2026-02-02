@@ -1,5 +1,6 @@
 import { addMonths } from 'date-fns';
 import {
+  Timestamp,
   collection,
   deleteDoc,
   doc,
@@ -9,7 +10,6 @@ import {
   query,
   serverTimestamp,
   setDoc,
-  Timestamp,
   writeBatch,
 } from 'firebase/firestore';
 
@@ -112,7 +112,9 @@ const fetchGoogle = async <T>(
 const encodeDocId = (value: string) =>
   encodeURIComponent(value).replace(/\./g, '%2E');
 
-const chunkedBatchCommit = async (batches: Array<ReturnType<typeof writeBatch>>) => {
+const chunkedBatchCommit = async (
+  batches: Array<ReturnType<typeof writeBatch>>,
+) => {
   for (const batch of batches) {
     await batch.commit();
   }
@@ -236,10 +238,9 @@ export const calendarApi = {
       }
       const token = await authApi.getGoogleAccessToken();
       const { start, end } = getRange(startDate, endDate);
-      const calendarList = await fetchGoogle<{ items: GoogleCalendarListItem[] }>(
-        '/users/me/calendarList',
-        token,
-      );
+      const calendarList = await fetchGoogle<{
+        items: GoogleCalendarListItem[];
+      }>('/users/me/calendarList', token);
       const calendars = (calendarList.items ?? []).map(mapCalendar);
 
       const events: StoredEvent[] = [];
@@ -330,7 +331,9 @@ export const calendarApi = {
       'calendars',
     );
     const snapshot = await getDocs(query(calendarsRef, orderBy('title')));
-    const calendars = snapshot.docs.map((docSnap) => docSnap.data() as StoredCalendar);
+    const calendars = snapshot.docs.map(
+      (docSnap) => docSnap.data() as StoredCalendar,
+    );
     return { data: calendars };
   },
 

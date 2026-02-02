@@ -1,31 +1,24 @@
 import {
   GoogleAuthProvider,
+  type User,
+  type UserCredential,
   browserLocalPersistence,
   onAuthStateChanged,
   reauthenticateWithPopup,
   setPersistence,
   signInWithPopup,
   signOut,
-  type User,
-  type UserCredential,
 } from 'firebase/auth';
-import {
-  doc,
-  getDoc,
-  serverTimestamp,
-  setDoc,
-} from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 
 import { auth, db, isFirestoreOfflineError } from '@/services/firebase';
-import { useAuthStore, type AuthUser } from '@/store/useAuthStore';
+import { type AuthUser, useAuthStore } from '@/store/useAuthStore';
 
 const GOOGLE_ACCESS_TOKEN_KEY = 'google-access-token';
 const GOOGLE_ACCESS_TOKEN_EXPIRY_KEY = 'google-access-token-expiry';
 const DEFAULT_TOKEN_LIFETIME_MS = 55 * 60 * 1000;
 
-const calendarScopes = [
-  'https://www.googleapis.com/auth/calendar.readonly',
-];
+const calendarScopes = ['https://www.googleapis.com/auth/calendar.readonly'];
 
 const buildProvider = () => {
   const provider = new GoogleAuthProvider();
@@ -69,7 +62,8 @@ const extractAccessToken = (
   const credential = GoogleAuthProvider.credentialFromResult(result);
   const accessToken = credential?.accessToken || null;
   const expiresIn = Number(result._tokenResponse?.expiresIn || 0);
-  const expiresAt = Date.now() + (expiresIn ? expiresIn * 1000 : DEFAULT_TOKEN_LIFETIME_MS);
+  const expiresAt =
+    Date.now() + (expiresIn ? expiresIn * 1000 : DEFAULT_TOKEN_LIFETIME_MS);
   return accessToken ? { accessToken, expiresAt } : null;
 };
 

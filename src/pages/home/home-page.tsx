@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
-import { useNavigate } from '@tanstack/react-router';
 import { IconCalendar, IconShieldLock, IconUsers } from '@tabler/icons-react';
+import { useNavigate } from '@tanstack/react-router';
 
 import { Layout } from '@/components';
 import { Button } from '@/components/ui/button';

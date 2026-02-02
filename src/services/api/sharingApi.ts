@@ -13,13 +13,13 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 
+import { readBucketEvents } from '@/services/api/eventBuckets';
 import {
   auth,
   db,
   isFirestoreOfflineError,
   isFirestorePermissionError,
 } from '@/services/firebase';
-import { readBucketEvents } from '@/services/api/eventBuckets';
 
 export type PrivacyLevel = 'busy_only' | 'basic_info' | 'full_details';
 export type SharingAudience = 'public' | 'restricted';

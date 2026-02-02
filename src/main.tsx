@@ -43,7 +43,9 @@ const shouldToastError = (args: unknown[]) => {
   const message = formatConsoleArgs(args).toLowerCase();
   if (!message) return false;
   if (message.includes('client is offline')) return false;
-  if (message.includes('failed to get document because the client is offline')) {
+  if (
+    message.includes('failed to get document because the client is offline')
+  ) {
     return false;
   }
   if (message.includes('network error')) return false;
@@ -65,7 +67,9 @@ const toastDedup = (() => {
 })();
 
 const patchConsoleErrors = () => {
-  const globalRef = window as typeof window & { __myttConsolePatched?: boolean };
+  const globalRef = window as typeof window & {
+    __myttConsolePatched?: boolean;
+  };
   if (globalRef.__myttConsolePatched) return;
   globalRef.__myttConsolePatched = true;
 

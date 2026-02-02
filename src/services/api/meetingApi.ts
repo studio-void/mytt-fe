@@ -1,5 +1,6 @@
 import { addMinutes } from 'date-fns';
 import {
+  Timestamp,
   collection,
   deleteDoc,
   doc,
@@ -9,16 +10,15 @@ import {
   query,
   serverTimestamp,
   setDoc,
-  Timestamp,
   where,
   writeBatch,
 } from 'firebase/firestore';
 
-import { auth, db } from '@/services/firebase';
 import {
   readBucketEvents,
   readMonthBucketEvents,
 } from '@/services/api/eventBuckets';
+import { auth, db } from '@/services/firebase';
 
 interface MeetingDoc {
   title: string;
@@ -171,7 +171,13 @@ const buildBusyBlocks = (
 };
 
 const upsertParticipant = async (meetingId: string, user: ParticipantDoc) => {
-  const participantRef = doc(db, 'meetings', meetingId, 'participants', user.uid);
+  const participantRef = doc(
+    db,
+    'meetings',
+    meetingId,
+    'participants',
+    user.uid,
+  );
   await setDoc(
     participantRef,
     {
@@ -191,7 +197,13 @@ const upsertAvailability = async (
 ) => {
   const events = await fetchUserEvents(userId, start, end);
   const busyBlocks = buildBusyBlocks(events, manualBlocks);
-  const availabilityRef = doc(db, 'meetings', meetingId, 'availability', userId);
+  const availabilityRef = doc(
+    db,
+    'meetings',
+    meetingId,
+    'availability',
+    userId,
+  );
   await setDoc(
     availabilityRef,
     {
@@ -270,7 +282,8 @@ const buildAvailabilitySlots = (
       endTime: slotEnd.toISOString(),
       availableCount,
       availability,
-      isOptimal: participants.length > 0 && availableCount === participants.length,
+      isOptimal:
+        participants.length > 0 && availableCount === participants.length,
     });
   }
 
@@ -357,7 +370,12 @@ export const meetingApi = {
     if (!snapshot.exists()) {
       throw new Error('약속을 찾을 수 없습니다.');
     }
-    return { data: meetingToClient({ id: snapshot.id, ...(snapshot.data() as MeetingDoc) }) };
+    return {
+      data: meetingToClient({
+        id: snapshot.id,
+        ...(snapshot.data() as MeetingDoc),
+      }),
+    };
   },
 
   getMeetingByCode: async (inviteCode: string) => {
@@ -414,10 +432,7 @@ export const meetingApi = {
     return { data: true };
   },
 
-  updateManualBlocks: async (
-    meetingId: string,
-    blocks: TimeBlock[],
-  ) => {
+  updateManualBlocks: async (meetingId: string, blocks: TimeBlock[]) => {
     const user = ensureUser();
     const meetingRef = doc(db, 'meetings', meetingId);
     const meetingSnap = await getDoc(meetingRef);

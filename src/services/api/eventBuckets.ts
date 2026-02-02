@@ -80,33 +80,31 @@ export const writeEventBuckets = async (
     });
   });
 
-  const writes = Array.from(grouped.entries()).map(([bucketId, bucketEvents]) => {
-    const payload = bucketEvents.map((event) =>
-      stripUndefined({
-        ...event,
-        startTime: Timestamp.fromDate(event.startTime),
-        endTime: Timestamp.fromDate(event.endTime),
-      }),
-    );
+  const writes = Array.from(grouped.entries()).map(
+    ([bucketId, bucketEvents]) => {
+      const payload = bucketEvents.map((event) =>
+        stripUndefined({
+          ...event,
+          startTime: Timestamp.fromDate(event.startTime),
+          endTime: Timestamp.fromDate(event.endTime),
+        }),
+      );
 
-    return setDoc(
-      doc(db, 'users', uid, 'eventBuckets', bucketId),
-      {
-        events: payload,
-        updatedAt: serverTimestamp(),
-      },
-      { merge: false },
-    );
-  });
+      return setDoc(
+        doc(db, 'users', uid, 'eventBuckets', bucketId),
+        {
+          events: payload,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: false },
+      );
+    },
+  );
 
   await Promise.all(writes);
 };
 
-export const readBucketEvents = async (
-  uid: string,
-  start: Date,
-  end: Date,
-) => {
+export const readBucketEvents = async (uid: string, start: Date, end: Date) => {
   const bucketIds = getBucketIdsForRange(start, end);
   const snapshots = await Promise.all(
     bucketIds.map((bucketId) =>
