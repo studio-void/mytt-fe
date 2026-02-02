@@ -6,6 +6,7 @@ export * from './dashboard/dashboard-page';
 export * from './meeting/create-meeting-page';
 export * from './meeting/join-meeting-page';
 export * from './meeting/meeting-join-page';
+export * from './meeting/meeting-list-page';
 export * from './schedule/calendar-page';
 export * from './schedule/share-schedule-page';
 export * from './schedule/view-schedule-page';

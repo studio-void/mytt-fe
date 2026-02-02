@@ -121,6 +121,7 @@ const meetingToClient = (meeting: { id: string } & MeetingDoc) => ({
   timezone: meeting.timezone,
   hostUid: meeting.hostUid,
   inviteCode: meeting.inviteCode,
+  createdAt: meeting.createdAt?.toDate().toISOString() ?? null,
 });
 
 const fetchUserEvents = async (uid: string, start: Date, end: Date) => {
@@ -429,6 +430,22 @@ export const meetingApi = {
       availabilityDocs,
     );
     return { data: { availabilitySlots, availabilityDocs, participants } };
+  },
+
+  getMyMeetings: async () => {
+    const user = ensureUser();
+    const meetingsRef = collection(db, 'meetings');
+    const snapshot = await getDocs(
+      query(meetingsRef, where('hostUid', '==', user.uid)),
+    );
+    const meetings = snapshot.docs.map((docSnap) =>
+      meetingToClient({ id: docSnap.id, ...(docSnap.data() as MeetingDoc) }),
+    );
+    meetings.sort((a, b) => {
+      if (!a.startTime || !b.startTime) return 0;
+      return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+    });
+    return { data: meetings };
   },
 
   getMyAvailability: async (meetingId: string) => {

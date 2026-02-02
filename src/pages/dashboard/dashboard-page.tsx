@@ -15,8 +15,8 @@ export const DashboardPage: React.FC = () => {
     }
   }, [isAuthenticated, isAuthReady, navigate]);
 
-  const handleCreateMeeting = () => {
-    navigate({ to: '/meeting/create' });
+  const handleMeeting = () => {
+    navigate({ to: '/meeting' });
   };
 
   const handleShareSchedule = () => {
@@ -37,7 +37,7 @@ export const DashboardPage: React.FC = () => {
 
         <div className="grid md:grid-cols-2 gap-6">
           <button
-            onClick={handleCreateMeeting}
+            onClick={handleMeeting}
             className="p-8 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors text-left group"
           >
             <div className="text-4xl mb-4">📅</div>
