@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
 
-import { useNavigate } from '@tanstack/react-router';
 import {
   IconCalendar,
   IconCalendarEvent,
   IconLink,
   IconMail,
 } from '@tabler/icons-react';
+import { useNavigate } from '@tanstack/react-router';
 
 import { Layout } from '@/components';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -35,7 +35,7 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <Layout>
-      <div className="max-w-5xl mx-auto py-12 sm:py-16">
+      <div className="mx-auto py-12 sm:py-16">
         <div className="text-center mb-10 sm:mb-16">
           <h1 className="text-3xl sm:text-4xl font-bold mb-2">대시보드</h1>
           <p className="text-gray-600 text-base sm:text-lg">

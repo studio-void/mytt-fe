@@ -119,7 +119,7 @@ export function ViewSchedulePage() {
   if (loading) {
     return (
       <Layout>
-        <div className="max-w-6xl mx-auto py-8">
+        <div className="mx-auto py-8">
           <div className="text-center">로딩 중...</div>
         </div>
       </Layout>
@@ -129,7 +129,7 @@ export function ViewSchedulePage() {
   if (accessDenied) {
     return (
       <Layout>
-        <div className="max-w-4xl mx-auto py-8">
+        <div className="mx-auto py-8">
           <div className="text-center">
             <p className="text-lg font-semibold mb-2">접근이 제한되었습니다.</p>
             <p className="text-gray-500">
@@ -144,7 +144,7 @@ export function ViewSchedulePage() {
   if (!schedule) {
     return (
       <Layout>
-        <div className="max-w-4xl mx-auto py-8">
+        <div className="mx-auto py-8">
           <div className="text-center">일정을 찾을 수 없습니다.</div>
         </div>
       </Layout>
@@ -153,7 +153,7 @@ export function ViewSchedulePage() {
 
   return (
     <Layout>
-      <div className="max-w-6xl mx-auto py-8">
+      <div className="mx-auto py-8">
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
@@ -328,14 +328,13 @@ export function ViewSchedulePage() {
                                 />
                                 <span className="flex-1 truncate">
                                   {event.isAllDay
-                                    ? event.title ?? '바쁜 시간'
-                                    : `${new Date(event.startTime).toLocaleTimeString(
-                                        'ko-KR',
-                                        {
-                                          hour: '2-digit',
-                                          minute: '2-digit',
-                                        },
-                                      )} ${event.title ?? '바쁜 시간'}`}
+                                    ? (event.title ?? '바쁜 시간')
+                                    : `${new Date(
+                                        event.startTime,
+                                      ).toLocaleTimeString('ko-KR', {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })} ${event.title ?? '바쁜 시간'}`}
                                 </span>
                               </div>
                             ))}

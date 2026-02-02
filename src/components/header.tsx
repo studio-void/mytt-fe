@@ -27,7 +27,7 @@ export const Header = forwardRef<
       ref={ref}
       className="border-b border-gray-200 bg-white sticky top-0 z-50"
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex gap-4 justify-between items-center">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-4 flex gap-4 justify-between items-center">
         <nav className="flex flex-row gap-8 items-center">
           <Link
             to="/"

@@ -176,7 +176,7 @@ export function CalendarPage() {
 
   return (
     <Layout>
-      <div className="max-w-6xl mx-auto py-8">
+      <div className="mx-auto py-8">
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <h1 className="text-2xl sm:text-3xl font-bold">일정 관리</h1>

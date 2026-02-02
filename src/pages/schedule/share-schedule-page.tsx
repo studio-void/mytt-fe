@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { useNavigate } from '@tanstack/react-router';
 import { IconCalendar, IconLink } from '@tabler/icons-react';
+import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
 import { Layout } from '@/components';
@@ -177,7 +177,7 @@ export function ShareSchedulePage() {
   if (loading && links.length === 0) {
     return (
       <Layout>
-        <div className="max-w-4xl mx-auto py-8">
+        <div className="mx-auto py-8">
           <div className="text-center">로딩 중...</div>
         </div>
       </Layout>
@@ -186,7 +186,7 @@ export function ShareSchedulePage() {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto py-8">
+      <div className="mx-auto py-8">
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold mb-2">일정 공유</h1>
           <p className="text-gray-600 text-sm sm:text-base">

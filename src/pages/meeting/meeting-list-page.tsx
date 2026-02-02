@@ -59,7 +59,7 @@ export function MeetingListPage() {
   if (loading) {
     return (
       <Layout>
-        <div className="max-w-6xl mx-auto py-8">
+        <div className="mx-auto py-8">
           <div className="text-center">로딩 중...</div>
         </div>
       </Layout>
@@ -68,7 +68,7 @@ export function MeetingListPage() {
 
   return (
     <Layout>
-      <div className="max-w-6xl mx-auto py-8">
+      <div className="mx-auto py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold mb-1">내 약속</h1>
@@ -95,9 +95,7 @@ export function MeetingListPage() {
                 key={meeting.id}
                 className="border border-gray-200 rounded-lg p-6"
               >
-                <h2 className="text-lg font-semibold mb-2">
-                  {meeting.title}
-                </h2>
+                <h2 className="text-lg font-semibold mb-2">{meeting.title}</h2>
                 <p className="text-sm text-gray-600">
                   {formatDateTime(meeting.startTime)} -{' '}
                   {formatDateTime(meeting.endTime)}
