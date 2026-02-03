@@ -200,6 +200,21 @@ const retryProfileSyncWhenOnline = (user: User) => {
   window.addEventListener('online', handler);
 };
 
+const updateStoreUser = async (user: User) => {
+  const { setUser, setAuthReady } = useAuthStore.getState();
+  try {
+    const profile = await getUserProfile(user);
+    setUser(toAuthUser(user, profile));
+  } catch (error) {
+    if (!isFirestoreOfflineError(error)) {
+      console.error('Failed to load user profile:', error);
+    }
+    setUser(toAuthUser(user));
+  } finally {
+    setAuthReady(true);
+  }
+};
+
 const isIOSDevice = () => {
   if (typeof navigator === 'undefined') return false;
   const ua = navigator.userAgent.toLowerCase();
@@ -288,6 +303,12 @@ export const authApi = {
           resolve(authUser);
         });
       });
+      if (user) {
+        await updateStoreUser(user);
+      } else {
+        const { setAuthReady } = useAuthStore.getState();
+        setAuthReady(true);
+      }
       return {
         user,
         hasRedirectResult: false,
@@ -302,6 +323,7 @@ export const authApi = {
     }
     if (result.user) {
       await upsertUserProfile(result.user);
+      await updateStoreUser(result.user);
     }
     return {
       user: result.user ?? auth.currentUser,
