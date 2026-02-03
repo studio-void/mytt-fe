@@ -3,6 +3,7 @@ import type { User } from 'firebase/auth';
 import {
   Timestamp,
   collection,
+  collectionGroup,
   deleteDoc,
   doc,
   getDoc,
@@ -71,7 +72,7 @@ const ensureUser = () => {
 };
 
 const buildFallbackNickname = (user: User) =>
-  user.email ?? user.displayName ?? null;
+  user.displayName ?? user.email ?? null;
 
 const resolveParticipantProfile = async (user: User): Promise<ParticipantDoc> => {
   const userRef = doc(db, 'users', user.uid);
@@ -404,6 +405,21 @@ export const meetingApi = {
     return { data: { id: meeting.id } };
   },
 
+  leaveMeetingByCode: async (inviteCode: string) => {
+    const user = ensureUser();
+    const meeting = await fetchMeetingByInviteCode(inviteCode);
+    if (!meeting) {
+      throw new Error('약속을 찾을 수 없습니다.');
+    }
+
+    await Promise.all([
+      deleteDoc(doc(db, 'meetings', meeting.id, 'participants', user.uid)),
+      deleteDoc(doc(db, 'meetings', meeting.id, 'availability', user.uid)),
+    ]);
+
+    return { data: true };
+  },
+
   getMeetingDetail: async (meetingId: string) => {
     const meetingRef = doc(db, 'meetings', meetingId);
     const snapshot = await getDoc(meetingRef);
@@ -526,10 +542,10 @@ export const meetingApi = {
         const nickname =
           participant.nickname ??
           profile.nickname ??
-          profile.email ??
           profile.displayName ??
-          participant.email ??
+          profile.email ??
           participant.displayName ??
+          participant.email ??
           null;
         const photoURL =
           participant.photoURL ?? profile.photoURL ?? null;
@@ -623,6 +639,58 @@ export const meetingApi = {
     const meetings = snapshot.docs.map((docSnap) =>
       meetingToClient({ id: docSnap.id, ...(docSnap.data() as MeetingDoc) }),
     );
+    const now = Date.now();
+    const upcoming = meetings.filter(
+      (meeting) => meeting.endTime && new Date(meeting.endTime).getTime() >= now,
+    );
+    const past = meetings.filter(
+      (meeting) => meeting.endTime && new Date(meeting.endTime).getTime() < now,
+    );
+
+    upcoming.sort((a, b) => {
+      const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bCreated = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bCreated - aCreated;
+    });
+
+    past.sort((a, b) => {
+      const aStart = a.startTime ? new Date(a.startTime).getTime() : 0;
+      const bStart = b.startTime ? new Date(b.startTime).getTime() : 0;
+      return aStart - bStart;
+    });
+
+    const sorted = [...upcoming, ...past];
+    return { data: sorted };
+  },
+
+  getJoinedMeetings: async () => {
+    const user = ensureUser();
+    const participantsSnap = await getDocs(
+      query(
+        collectionGroup(db, 'participants'),
+        where('uid', '==', user.uid),
+      ),
+    );
+
+    const meetingIds = Array.from(
+      new Set(
+        participantsSnap.docs
+          .map((docSnap) => docSnap.ref.parent.parent?.id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+
+    const meetingDocs = await Promise.all(
+      meetingIds.map((meetingId) => getDoc(doc(db, 'meetings', meetingId))),
+    );
+
+    const meetings = meetingDocs
+      .filter((docSnap) => docSnap.exists())
+      .map((docSnap) =>
+        meetingToClient({ id: docSnap.id, ...(docSnap.data() as MeetingDoc) }),
+      )
+      .filter((meeting) => meeting.hostUid !== user.uid);
+
     const now = Date.now();
     const upcoming = meetings.filter(
       (meeting) => meeting.endTime && new Date(meeting.endTime).getTime() >= now,

@@ -16,7 +16,7 @@ export const Header = forwardRef<
   const { isAuthenticated, user, isAuthReady } = useAuthStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const displayName =
-    user?.nickname ?? user?.email ?? user?.displayName ?? '사용자';
+    user?.nickname ?? user?.displayName ?? user?.email ?? '사용자';
   const avatarFallback = displayName.slice(0, 2).toUpperCase();
 
   const handleLogout = () => {

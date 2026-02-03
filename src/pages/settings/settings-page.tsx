@@ -31,13 +31,13 @@ export function SettingsPage() {
     try {
       setLoading(true);
       const profile = await authApi.getProfile();
-      setNickname(profile.nickname ?? profile.email ?? '');
+      setNickname(profile.nickname ?? profile.displayName ?? profile.email ?? '');
       setPhotoURL(profile.photoURL ?? '');
       setEmail(profile.email ?? '');
     } catch (error) {
       console.error('Error loading profile:', error);
       toast.error('프로필 정보를 불러오는데 실패했습니다.');
-      setNickname(user?.nickname ?? user?.email ?? '');
+      setNickname(user?.nickname ?? user?.displayName ?? user?.email ?? '');
       setPhotoURL(user?.photoURL ?? '');
       setEmail(user?.email ?? '');
     } finally {
@@ -69,8 +69,8 @@ export function SettingsPage() {
   const displayName =
     nickname.trim() ||
     user?.nickname ||
-    user?.email ||
     user?.displayName ||
+    user?.email ||
     '사용자';
 
   if (loading) {

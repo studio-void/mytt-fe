@@ -48,7 +48,7 @@ const buildProvider = () => {
 };
 
 const buildFallbackNickname = (user: User) =>
-  user.email ?? user.displayName ?? null;
+  user.displayName ?? user.email ?? null;
 
 const toAuthUser = (user: User, profile?: UserProfileDoc): AuthUser => ({
   uid: user.uid,

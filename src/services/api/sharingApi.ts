@@ -107,8 +107,8 @@ const getOwnerProfile = async (
       email?: string | null;
       displayName?: string | null;
     };
-    const ownerNickname =
-      data.nickname ?? data.email ?? data.displayName ?? fallbackEmail ?? null;
+  const ownerNickname =
+    data.nickname ?? data.displayName ?? data.email ?? fallbackEmail ?? null;
     return {
       ownerNickname,
       ownerPhotoURL: data.photoURL ?? null,

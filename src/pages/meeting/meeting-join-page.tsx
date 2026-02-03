@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { useNavigate, useParams } from '@tanstack/react-router';
 import { motion } from 'framer-motion';
-import { Copy, RefreshCw, Save, Trash } from 'lucide-react';
+import { Check, Copy, LogIn, LogOut, RefreshCw, Save, Trash } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Layout } from '@/components';
@@ -34,6 +34,7 @@ interface ParticipantInfo {
   uid: string;
   email: string | null;
   nickname: string | null;
+  displayName: string | null;
   photoURL: string | null;
 }
 
@@ -58,6 +59,7 @@ export function MeetingJoinPage() {
   const [blockedSlots, setBlockedSlots] = useState<Set<string>>(new Set());
   const [isDragging, setIsDragging] = useState(false);
   const [dragMode, setDragMode] = useState<'add' | 'remove'>('add');
+  const [copiedInvite, setCopiedInvite] = useState(false);
   const [hoveredAvailability, setHoveredAvailability] = useState<{
     slot: TimeSlot;
     x: number;
@@ -69,6 +71,10 @@ export function MeetingJoinPage() {
     x: number;
     y: number;
   } | null>(null);
+  const hasOtherParticipants = useMemo(() => {
+    if (!participants || participants.length === 0) return false;
+    return participants.some((participant) => participant.uid !== user?.uid);
+  }, [participants, user?.uid]);
 
   useEffect(() => {
     if (!inviteCode) {
@@ -164,10 +170,35 @@ export function MeetingJoinPage() {
     }
   };
 
+  const handleLeaveMeeting = async () => {
+    if (!isAuthenticated) {
+      toast.error('로그인이 필요합니다.');
+      return;
+    }
+    const confirmed = window.confirm('약속에서 나가시겠어요?');
+    if (!confirmed) return;
+    try {
+      setJoining(true);
+      await meetingApi.leaveMeetingByCode(inviteCode!);
+      toast.success('약속에서 나갔습니다.');
+      setHasJoined(false);
+      navigate({ to: '/meeting' });
+    } catch (error) {
+      console.error('Error leaving meeting:', error);
+      toast.error('약속 나가기에 실패했습니다.');
+    } finally {
+      setJoining(false);
+    }
+  };
+
   const copyInviteLink = () => {
     const shareUrl = `${window.location.origin}/meeting/${inviteCode}`;
     navigator.clipboard.writeText(shareUrl);
     toast.success('초대 링크가 복사되었습니다!');
+    setCopiedInvite(true);
+    window.setTimeout(() => {
+      setCopiedInvite(false);
+    }, 1200);
   };
 
   const handleRemoveBlock = (index: number) => {
@@ -333,6 +364,7 @@ export function MeetingJoinPage() {
           uid: participant.uid,
           label:
             participant.nickname ??
+            participant.displayName ??
             participant.email ??
             participant.uid ??
             '알 수 없음',
@@ -454,7 +486,16 @@ export function MeetingJoinPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button onClick={copyInviteLink} variant="outline">
-                <Copy />
+                <motion.span
+                  key={copiedInvite ? 'check' : 'copy'}
+                  initial={{ opacity: 0, scale: 0.6 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.6 }}
+                  transition={{ duration: 0.18 }}
+                  className="inline-flex"
+                >
+                  {copiedInvite ? <Check /> : <Copy />}
+                </motion.span>
                 링크 복사
               </Button>
               {isAuthenticated && (
@@ -478,13 +519,33 @@ export function MeetingJoinPage() {
                 </Button>
               )}
               {isAuthenticated && user?.uid === meeting.hostUid && (
-                <Button variant="destructive" onClick={handleDeleteMeeting}>
-                  <Trash />
-                  약속 삭제
-                </Button>
+                <div className="relative group">
+                  <Button
+                    variant="destructive"
+                    onClick={handleDeleteMeeting}
+                    disabled={hasOtherParticipants}
+                  >
+                    <Trash />
+                    약속 삭제
+                  </Button>
+                  {hasOtherParticipants && (
+                    <div className="pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow-md transition-opacity group-hover:opacity-100">
+                      다른 참가자가 있어 삭제할 수 없습니다.
+                    </div>
+                  )}
+                </div>
               )}
+              {hasJoined &&
+                isAuthenticated &&
+                user?.uid !== meeting.hostUid && (
+                  <Button variant="destructive" onClick={handleLeaveMeeting}>
+                    <LogOut />
+                    약속 나가기
+                  </Button>
+                )}
               {!hasJoined && isAuthenticated && (
                 <Button onClick={handleJoinMeeting} disabled={joining}>
+                  <LogIn />
                   {joining ? '참여 중...' : '약속 참여'}
                 </Button>
               )}
@@ -506,6 +567,7 @@ export function MeetingJoinPage() {
                 {participants.map((participant, index) => {
                   const label =
                     participant.nickname ??
+                    participant.displayName ??
                     participant.email ??
                     participant.uid ??
                     '알 수 없음';
