@@ -536,11 +536,28 @@ export const meetingApi = {
     const meetings = snapshot.docs.map((docSnap) =>
       meetingToClient({ id: docSnap.id, ...(docSnap.data() as MeetingDoc) }),
     );
-    meetings.sort((a, b) => {
-      if (!a.startTime || !b.startTime) return 0;
-      return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+    const now = Date.now();
+    const upcoming = meetings.filter(
+      (meeting) => meeting.endTime && new Date(meeting.endTime).getTime() >= now,
+    );
+    const past = meetings.filter(
+      (meeting) => meeting.endTime && new Date(meeting.endTime).getTime() < now,
+    );
+
+    upcoming.sort((a, b) => {
+      const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bCreated = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bCreated - aCreated;
     });
-    return { data: meetings };
+
+    past.sort((a, b) => {
+      const aStart = a.startTime ? new Date(a.startTime).getTime() : 0;
+      const bStart = b.startTime ? new Date(b.startTime).getTime() : 0;
+      return aStart - bStart;
+    });
+
+    const sorted = [...upcoming, ...past];
+    return { data: sorted };
   },
 
   getMyAvailability: async (meetingId: string) => {
