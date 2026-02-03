@@ -57,6 +57,8 @@ export function MeetingListPage() {
       hour12: false,
     });
 
+  const isPastMeeting = (endTime: string) => new Date(endTime) < new Date();
+
   if (loading) {
     return (
       <Layout>
@@ -94,7 +96,9 @@ export function MeetingListPage() {
             {meetings.map((meeting) => (
               <div
                 key={meeting.id}
-                className="border border-gray-200 rounded-lg p-6"
+                className={`border border-gray-200 rounded-lg p-6 ${
+                  isPastMeeting(meeting.endTime) ? 'bg-gray-50' : 'bg-white'
+                }`}
               >
                 <h2 className="text-lg font-semibold mb-2">{meeting.title}</h2>
                 <p className="text-sm text-gray-600">
