@@ -46,7 +46,7 @@ export function JoinMeetingPage() {
     <Layout>
       <div className="flex items-center justify-center min-h-screen">
         <div className="rounded-lg p-8 max-w-md w-full">
-          <h1 className="text-3xl font-bold mb-2">약속 참여하기</h1>
+          <h1 className="text-3xl font-extrabold mb-2">약속 참여하기</h1>
           <p className="text-gray-600 mb-6">공유받은 초대 코드를 입력하세요</p>
 
           {!isAuthReady ? (

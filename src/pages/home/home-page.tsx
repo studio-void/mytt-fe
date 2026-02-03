@@ -21,7 +21,7 @@ export const HomePage: React.FC = () => {
   return (
     <Layout>
       <div className="max-w-4xl mx-auto py-20 sm:py-28 text-center">
-        <h1 className="text-4xl sm:text-6xl font-bold mb-4">MyTT</h1>
+        <h1 className="text-4xl sm:text-6xl font-extrabold mb-4">MyTT</h1>
         <p className="text-base sm:text-xl text-gray-600 mb-10 sm:mb-12 max-w-2xl mx-auto leading-relaxed">
           Google Calendar를 연동하여 팀과 함께 공통 일정을 찾고,
           <br />

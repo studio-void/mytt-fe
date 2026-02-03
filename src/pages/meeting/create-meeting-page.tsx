@@ -109,7 +109,7 @@ export function CreateMeetingPage() {
     <Layout>
       <div className="mx-auto py-12">
         <div className="rounded-lg p-8">
-          <h1 className="text-3xl font-bold mb-8">새 약속 만들기</h1>
+          <h1 className="text-3xl font-extrabold mb-8">새 약속 만들기</h1>
 
           <form onSubmit={handleCreateMeeting} className="space-y-6">
             <div>

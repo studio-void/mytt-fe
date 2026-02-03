@@ -71,7 +71,7 @@ export function MeetingListPage() {
       <div className="mx-auto py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold mb-1">내 약속</h1>
+            <h1 className="text-3xl font-extrabold mb-1">내 약속</h1>
             <p className="text-gray-600">내가 만든 약속을 확인하세요.</p>
           </div>
           <Button onClick={() => navigate({ to: '/meeting/create' })}>

@@ -37,7 +37,7 @@ export const DashboardPage: React.FC = () => {
     <Layout>
       <div className="mx-auto py-12 sm:py-16">
         <div className="text-center mb-10 sm:mb-16">
-          <h1 className="text-3xl sm:text-4xl font-bold mb-2">대시보드</h1>
+          <h1 className="text-3xl sm:text-4xl font-extrabold mb-2">대시보드</h1>
           <p className="text-gray-600 text-base sm:text-lg">
             원하는 기능을 선택하세요
           </p>

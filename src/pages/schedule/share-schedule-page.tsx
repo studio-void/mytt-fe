@@ -192,7 +192,9 @@ export function ShareSchedulePage() {
     <Layout>
       <div className="mx-auto py-8">
         <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold mb-2">일정 공유</h1>
+          <h1 className="text-2xl sm:text-3xl font-extrabold mb-2">
+            일정 공유
+          </h1>
           <p className="text-gray-600 text-sm sm:text-base">
             여러 개의 공유 링크를 만들고 각 링크별로 공개 범위를 설정하세요.
           </p>

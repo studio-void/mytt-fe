@@ -158,7 +158,7 @@ export function ViewSchedulePage() {
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold mb-1">
+              <h1 className="text-2xl sm:text-3xl font-extrabold mb-1">
                 {schedule.userEmail}님의 일정
               </h1>
               <div className="flex items-center gap-2">

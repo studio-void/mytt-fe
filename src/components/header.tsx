@@ -32,9 +32,13 @@ export const Header = forwardRef<
           <Link
             to="/"
             onClick={() => setIsMobileMenuOpen(false)}
-            className="text-2xl font-bold text-gray-900 hover:text-gray-700"
+            className="inline-flex items-center hover:opacity-90"
           >
-            MyTT
+            <img
+              src="/MyTT.svg"
+              alt="MyTT"
+              className="h-7 w-auto translate-y-0.5"
+            />
           </Link>
 
           {isAuthenticated && (

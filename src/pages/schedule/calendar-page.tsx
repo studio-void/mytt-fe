@@ -183,7 +183,7 @@ export function CalendarPage() {
       <div className="mx-auto py-8">
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <h1 className="text-2xl sm:text-3xl font-bold">일정 관리</h1>
+            <h1 className="text-2xl sm:text-3xl font-extrabold">일정 관리</h1>
             <Button onClick={handleSyncCalendar} disabled={loading}>
               {loading ? '동기화 중...' : '캘린더 동기화'}
             </Button>

@@ -372,7 +372,7 @@ export function MeetingJoinPage() {
         <div className="border border-gray-200 rounded-lg p-8 mb-6">
           <div className="flex justify-between items-start mb-4">
             <div>
-              <h1 className="text-3xl font-bold mb-2">{meeting.title}</h1>
+              <h1 className="text-3xl font-extrabold mb-2">{meeting.title}</h1>
               {meeting.description && (
                 <p className="text-gray-600 mb-4">{meeting.description}</p>
               )}
@@ -438,7 +438,7 @@ export function MeetingJoinPage() {
         {/* 가용성 시각화 */}
         {isAuthenticated && availabilitySlots.length > 0 && (
           <div className="border border-gray-200 rounded-lg p-8">
-            <h2 className="text-2xl font-bold mb-6">최적의 시간 찾기</h2>
+            <h2 className="text-2xl font-extrabold mb-6">최적의 시간 찾기</h2>
             {meetingRange && weekStart && (
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -646,7 +646,9 @@ export function MeetingJoinPage() {
 
         {isAuthenticated && hasJoined && (
           <div className="border border-gray-200 rounded-lg p-8 mt-6">
-            <h2 className="text-xl font-bold mb-4">내 일정에서 제외할 시간</h2>
+            <h2 className="text-xl font-extrabold mb-4">
+              내 일정에서 제외할 시간
+            </h2>
             <p className="text-sm text-gray-600 mb-4">
               Google 캘린더에 없는 일정도 직접 차단할 수 있습니다.
             </p>
