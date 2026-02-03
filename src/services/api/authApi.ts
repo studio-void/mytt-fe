@@ -3,10 +3,13 @@ import {
   type User,
   type UserCredential,
   browserLocalPersistence,
+  getRedirectResult,
   onAuthStateChanged,
   reauthenticateWithPopup,
+  reauthenticateWithRedirect,
   setPersistence,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
 } from 'firebase/auth';
 import {
@@ -195,10 +198,26 @@ const retryProfileSyncWhenOnline = (user: User) => {
   window.addEventListener('online', handler);
 };
 
+const isStandalonePwa = () => {
+  if (typeof window === 'undefined') return false;
+  const standaloneMatch =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(display-mode: standalone)').matches;
+  const iosStandalone =
+    'standalone' in navigator && Boolean((navigator as { standalone?: boolean }).standalone);
+  return Boolean(standaloneMatch || iosStandalone);
+};
+
+const shouldUseRedirect = () => isStandalonePwa();
+
 export const authApi = {
   googleLogin: async () => {
     await setPersistence(auth, browserLocalPersistence);
     const provider = buildProvider();
+    if (shouldUseRedirect()) {
+      await signInWithRedirect(auth, provider);
+      return null;
+    }
     const result = await signInWithPopup(auth, provider);
     const tokenData = extractAccessToken(
       result as UserCredential & { _tokenResponse?: { expiresIn?: string } },
@@ -220,6 +239,21 @@ export const authApi = {
   observeAuthState: (callback: (user: User | null) => void) =>
     onAuthStateChanged(auth, callback),
 
+  completeRedirectSignIn: async () => {
+    const result = await getRedirectResult(auth);
+    if (!result) return null;
+    const tokenData = extractAccessToken(
+      result as UserCredential & { _tokenResponse?: { expiresIn?: string } },
+    );
+    if (tokenData?.accessToken) {
+      storeToken(tokenData.accessToken, tokenData.expiresAt);
+    }
+    if (result.user) {
+      await upsertUserProfile(result.user);
+    }
+    return result.user;
+  },
+
   getGoogleAccessToken: async () => {
     const { token, expiresAt } = getStoredToken();
     if (token && Date.now() < expiresAt - 60_000) {
@@ -231,6 +265,10 @@ export const authApi = {
     }
 
     const provider = buildProvider();
+    if (shouldUseRedirect()) {
+      await reauthenticateWithRedirect(auth.currentUser, provider);
+      throw new Error('리디렉트 인증이 필요합니다.');
+    }
     const result = await reauthenticateWithPopup(auth.currentUser, provider);
     const tokenData = extractAccessToken(
       result as UserCredential & { _tokenResponse?: { expiresIn?: string } },
