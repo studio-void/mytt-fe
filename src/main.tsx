@@ -21,7 +21,7 @@ const router = createRouter({
   defaultStructuralSharing: true,
   defaultPreloadStaleTime: 0,
   defaultNotFoundComponent: () => <NotFoundPage />,
-  defaultViewTransition: true,
+  defaultViewTransition: false,
 });
 
 const formatConsoleArgs = (args: unknown[]) => {
