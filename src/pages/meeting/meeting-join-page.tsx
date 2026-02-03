@@ -740,7 +740,7 @@ export function MeetingJoinPage() {
         {isAuthenticated && availabilitySlots.length > 0 && (
           <div className="border border-gray-200 rounded-lg p-5 sm:p-8">
             <h2 className="text-xl sm:text-2xl font-extrabold mb-6">
-              최적의 약속 시간 찾기
+              최적의 약속 잡기
             </h2>
             {meetingRange && weekStart && (
               <div className="space-y-4">
@@ -1265,7 +1265,7 @@ export function MeetingJoinPage() {
         {!isAuthenticated && (
           <div className="border border-gray-200 rounded-lg p-5 sm:p-8 text-center">
             <p className="text-gray-600 mb-4">
-              로그인하여 일정을 연동하고 최적의 약속 시간을 확인하세요.
+              로그인하여 일정을 연동하고 최적의 약속 시간을 함께 찾아보세요.
             </p>
             <Button onClick={() => navigate({ to: '/auth/login' })}>
               Google 계정으로 로그인
