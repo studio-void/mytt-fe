@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 
 import { Layout } from '@/components';
 import { Button } from '@/components/ui/button';
-import { calendarApi } from '@/services/api/calendarApi';
+import { calendarApi, type StoredEvent } from '@/services/api/calendarApi';
 import { meetingApi } from '@/services/api/meetingApi';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -57,6 +57,12 @@ export function MeetingJoinPage() {
   const [dragMode, setDragMode] = useState<'add' | 'remove'>('add');
   const [hoveredAvailability, setHoveredAvailability] = useState<{
     slot: TimeSlot;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [calendarEvents, setCalendarEvents] = useState<StoredEvent[]>([]);
+  const [hoveredCalendarEvent, setHoveredCalendarEvent] = useState<{
+    event: StoredEvent;
     x: number;
     y: number;
   } | null>(null);
@@ -200,6 +206,17 @@ export function MeetingJoinPage() {
     }
   };
 
+  const loadCalendarEvents = async (start: Date, end: Date) => {
+    try {
+      const response = await calendarApi.getEvents(start, end);
+      const events = (response.data ?? []).filter((event) => event.isBusy);
+      setCalendarEvents(events);
+    } catch (error) {
+      console.error('Error loading calendar events:', error);
+      setCalendarEvents([]);
+    }
+  };
+
   const handleManualSync = async () => {
     if (!meeting?.id) return;
     try {
@@ -223,6 +240,9 @@ export function MeetingJoinPage() {
       );
       setAvailabilitySlots(availabilityResponse.data.availabilitySlots);
       setAvailabilityDocs(availabilityResponse.data.availabilityDocs ?? []);
+      if (meetingRange) {
+        await loadCalendarEvents(meetingRange.start, meetingRange.end);
+      }
     } catch (error) {
       console.error('Error manual sync:', error);
       toast.error('동기화에 실패했습니다.');
@@ -333,6 +353,43 @@ export function MeetingJoinPage() {
     if (!meetingRange) return;
     setBlockedSlots(buildSlotsFromBlocks(manualBlocks, meetingRange));
   }, [manualBlocks, meetingRange]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !meetingRange) {
+      setCalendarEvents([]);
+      return;
+    }
+    loadCalendarEvents(meetingRange.start, meetingRange.end);
+  }, [isAuthenticated, meetingRange]);
+
+  const busySlotEventMap = useMemo(() => {
+    const map = new Map<string, StoredEvent>();
+    if (!meetingRange || calendarEvents.length === 0) return map;
+    const rangeStart = meetingRange.start;
+    const rangeEnd = meetingRange.end;
+    calendarEvents.forEach((event) => {
+      const eventStart = new Date(event.startTime);
+      const eventEnd = new Date(event.endTime);
+      if (eventEnd <= rangeStart || eventStart >= rangeEnd) return;
+      let cursor = new Date(
+        Math.max(eventStart.getTime(), rangeStart.getTime()),
+      );
+      cursor.setMinutes(
+        Math.floor(cursor.getMinutes() / SLOT_MINUTES) * SLOT_MINUTES,
+        0,
+        0,
+      );
+      const end = new Date(Math.min(eventEnd.getTime(), rangeEnd.getTime()));
+      while (cursor < end) {
+        const slotId = cursor.toISOString();
+        if (!map.has(slotId)) {
+          map.set(slotId, event);
+        }
+        cursor = addMinutes(cursor, SLOT_MINUTES);
+      }
+    });
+    return map;
+  }, [calendarEvents, meetingRange]);
 
   const handleToggleSlot = (slotId: string, action: 'add' | 'remove') => {
     setBlockedSlots((prev) => {
@@ -746,6 +803,7 @@ export function MeetingJoinPage() {
                             const slotId = slotStart.toISOString();
                             const isBlocked = blockedSlots.has(slotId);
                             const isCalendarBusy = myBusySlots.has(slotId);
+                            const slotEvent = busySlotEventMap.get(slotId);
 
                             return (
                               <div
@@ -762,6 +820,13 @@ export function MeetingJoinPage() {
                                     : 'bg-gray-50'
                                 }`}
                                 style={{ height: SLOT_HEIGHT }}
+                                title={
+                                  slotEvent
+                                    ? `${slotEvent.title ?? '일정'}\n${
+                                        slotEvent.calendarTitle ?? '캘린더'
+                                      }\n${slotEvent.location ?? '장소 없음'}`
+                                    : ''
+                                }
                                 onPointerDown={(event) => {
                                   if (!inRange) return;
                                   event.preventDefault();
@@ -774,6 +839,17 @@ export function MeetingJoinPage() {
                                   if (!isDragging || !inRange) return;
                                   handleToggleSlot(slotId, dragMode);
                                 }}
+                                onMouseEnter={(event) => {
+                                  if (isDragging || !slotEvent) return;
+                                  setHoveredCalendarEvent({
+                                    event: slotEvent,
+                                    x: event.clientX,
+                                    y: event.clientY,
+                                  });
+                                }}
+                                onMouseLeave={() =>
+                                  setHoveredCalendarEvent(null)
+                                }
                               />
                             );
                           })}
@@ -782,6 +858,26 @@ export function MeetingJoinPage() {
                     })}
                   </div>
                 </div>
+
+                {hoveredCalendarEvent && (
+                  <div
+                    className="fixed z-50 w-64 rounded-lg border border-gray-200 bg-white p-3 text-xs shadow-lg"
+                    style={{
+                      top: hoveredCalendarEvent.y + 12,
+                      left: hoveredCalendarEvent.x + 12,
+                    }}
+                  >
+                    <div className="font-semibold text-gray-800 mb-1">
+                      {hoveredCalendarEvent.event.title ?? '일정'}
+                    </div>
+                    <div className="text-[11px] text-gray-500 mb-1">
+                      {hoveredCalendarEvent.event.calendarTitle ?? '캘린더'}
+                    </div>
+                    <div className="text-[11px] text-gray-500">
+                      {hoveredCalendarEvent.event.location || '장소 없음'}
+                    </div>
+                  </div>
+                )}
 
                 <div className="mt-4 space-y-2">
                   {derivedBlocks.length > 0 ? (
