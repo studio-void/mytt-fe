@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { useNavigate, useParams } from '@tanstack/react-router';
+import { motion } from 'framer-motion';
 import { Copy, RefreshCw, Save, Trash } from 'lucide-react';
 import { toast } from 'sonner';
-import { motion } from 'framer-motion';
 
 import { Layout } from '@/components';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,8 @@ interface AvailabilityDoc {
 interface ParticipantInfo {
   uid: string;
   email: string | null;
+  nickname: string | null;
+  photoURL: string | null;
 }
 
 export function MeetingJoinPage() {
@@ -44,7 +46,7 @@ export function MeetingJoinPage() {
   const [joining, setJoining] = useState(false);
   const [savingBlocks, setSavingBlocks] = useState(false);
   const [meeting, setMeeting] = useState<any>(null);
-  const [participants, setParticipants] = useState<any[]>([]);
+  const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   const [availabilitySlots, setAvailabilitySlots] = useState<TimeSlot[]>([]);
   const [availabilityDocs, setAvailabilityDocs] = useState<AvailabilityDoc[]>(
     [],
@@ -329,7 +331,12 @@ export function MeetingJoinPage() {
       participants
         .map((participant: ParticipantInfo) => ({
           uid: participant.uid,
-          email: participant.email ?? '알 수 없음',
+          label:
+            participant.nickname ??
+            participant.email ??
+            participant.uid ??
+            '알 수 없음',
+          photoURL: participant.photoURL ?? null,
         }))
         .filter((participant) => participant.uid),
     [participants],
@@ -496,14 +503,33 @@ export function MeetingJoinPage() {
                 참가자 ({participants.length}명)
               </h2>
               <div className="flex flex-wrap gap-2">
-                {participants.map((participant, index) => (
-                  <div
-                    key={index}
-                    className="px-3 py-1 border border-gray-200 rounded-full text-sm"
-                  >
-                    {participant.email}
-                  </div>
-                ))}
+                {participants.map((participant, index) => {
+                  const label =
+                    participant.nickname ??
+                    participant.email ??
+                    participant.uid ??
+                    '알 수 없음';
+                  const fallback = label.slice(0, 2).toUpperCase();
+                  return (
+                    <div
+                      key={index}
+                      className="flex items-center gap-2 pl-1.5 pr-3 py-1 border border-gray-200 rounded-full text-sm"
+                    >
+                      <span className="inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-gray-100 text-[10px] font-semibold text-gray-600">
+                        {participant.photoURL ? (
+                          <img
+                            src={participant.photoURL}
+                            alt={label}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          fallback
+                        )}
+                      </span>
+                      <span>{label}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -680,12 +706,12 @@ export function MeetingJoinPage() {
                               </div>
                               {availability.available.length > 0 ? (
                                 <div className="flex flex-wrap gap-1">
-                                  {availability.available.map((email) => (
+                                  {availability.available.map((name) => (
                                     <span
-                                      key={email}
+                                      key={name}
                                       className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] text-blue-700"
                                     >
-                                      {email}
+                                      {name}
                                     </span>
                                   ))}
                                 </div>
@@ -701,12 +727,12 @@ export function MeetingJoinPage() {
                               </div>
                               {availability.unavailable.length > 0 ? (
                                 <div className="flex flex-wrap gap-1">
-                                  {availability.unavailable.map((email) => (
+                                  {availability.unavailable.map((name) => (
                                     <span
-                                      key={email}
+                                      key={name}
                                       className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600"
                                     >
-                                      {email}
+                                      {name}
                                     </span>
                                   ))}
                                 </div>
@@ -1126,7 +1152,7 @@ const getAvailabilityColor = (availability: number) => {
 const getSlotAvailabilityDetails = (
   startTime: string,
   endTime: string,
-  participants: Array<{ uid: string; email: string }>,
+  participants: Array<{ uid: string; label: string }>,
   availabilityDocs: Map<string, AvailabilityDoc>,
 ) => {
   const slotStart = new Date(startTime);
@@ -1137,16 +1163,16 @@ const getSlotAvailabilityDetails = (
   participants.forEach((participant) => {
     const doc = availabilityDocs.get(participant.uid);
     if (!doc) {
-      available.push(`${participant.email} (미응답)`);
+      available.push(`${participant.label} (미응답)`);
       return;
     }
     const isBusy = doc.busyBlocks.some((block) =>
       blocksOverlap(slotStart, slotEnd, block),
     );
     if (isBusy) {
-      unavailable.push(participant.email);
+      unavailable.push(participant.label);
     } else {
-      available.push(participant.email);
+      available.push(participant.label);
     }
   });
 

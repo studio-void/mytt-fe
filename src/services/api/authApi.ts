@@ -9,7 +9,17 @@ import {
   signInWithPopup,
   signOut,
 } from 'firebase/auth';
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
+  writeBatch,
+} from 'firebase/firestore';
 
 import { auth, db, isFirestoreOfflineError } from '@/services/firebase';
 import { type AuthUser, useAuthStore } from '@/store/useAuthStore';
@@ -23,6 +33,13 @@ const calendarScopes = [
   'https://www.googleapis.com/auth/calendar.app.created',
 ];
 
+type UserProfileDoc = {
+  nickname?: string | null;
+  photoURL?: string | null;
+  email?: string | null;
+  displayName?: string | null;
+};
+
 const buildProvider = () => {
   const provider = new GoogleAuthProvider();
   calendarScopes.forEach((scope) => provider.addScope(scope));
@@ -30,11 +47,15 @@ const buildProvider = () => {
   return provider;
 };
 
-const toAuthUser = (user: User): AuthUser => ({
+const buildFallbackNickname = (user: User) =>
+  user.email ?? user.displayName ?? null;
+
+const toAuthUser = (user: User, profile?: UserProfileDoc): AuthUser => ({
   uid: user.uid,
   email: user.email,
   displayName: user.displayName,
-  photoURL: user.photoURL,
+  nickname: profile?.nickname ?? buildFallbackNickname(user),
+  photoURL: profile?.photoURL ?? user.photoURL,
 });
 
 const getStoredToken = () => {
@@ -73,17 +94,88 @@ const extractAccessToken = (
 const upsertUserProfile = async (user: User) => {
   const userRef = doc(db, 'users', user.uid);
   const existing = await getDoc(userRef);
+  const existingData = existing.exists()
+    ? (existing.data() as UserProfileDoc)
+    : null;
+  const nickname = existingData?.nickname ?? buildFallbackNickname(user);
+  const photoURL = existingData?.photoURL ?? user.photoURL ?? null;
   const basePayload = {
     uid: user.uid,
     email: user.email,
     displayName: user.displayName,
-    photoURL: user.photoURL,
+    nickname,
+    photoURL,
     updatedAt: serverTimestamp(),
   };
   const payload = existing.exists()
     ? basePayload
     : { ...basePayload, createdAt: serverTimestamp() };
   await setDoc(userRef, payload, { merge: true });
+};
+
+const getUserProfile = async (user: User) => {
+  const userRef = doc(db, 'users', user.uid);
+  const snapshot = await getDoc(userRef);
+  const fallbackNickname = buildFallbackNickname(user);
+  const fallbackPhotoURL = user.photoURL ?? null;
+
+  if (!snapshot.exists()) {
+    const payload = {
+      uid: user.uid,
+      email: user.email,
+      displayName: user.displayName,
+      nickname: fallbackNickname,
+      photoURL: fallbackPhotoURL,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+    await setDoc(userRef, payload, { merge: true });
+    return payload;
+  }
+
+  const data = snapshot.data() as UserProfileDoc;
+  const nickname = data.nickname ?? fallbackNickname;
+  const photoURL = data.photoURL ?? fallbackPhotoURL;
+
+  const needsNickname = !data.nickname && nickname;
+  const needsPhotoURL = !data.photoURL && photoURL;
+  if (needsNickname || needsPhotoURL) {
+    await setDoc(
+      userRef,
+      {
+        ...(needsNickname ? { nickname } : {}),
+        ...(needsPhotoURL ? { photoURL } : {}),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+  }
+
+  return { ...data, nickname, photoURL };
+};
+
+const updateShareLinksForOwner = async (
+  uid: string,
+  ownerNickname: string,
+  ownerPhotoURL: string | null,
+) => {
+  const snapshot = await getDocs(
+    query(collection(db, 'shareLinks'), where('ownerUid', '==', uid)),
+  );
+  if (snapshot.empty) return;
+  const batch = writeBatch(db);
+  snapshot.docs.forEach((docSnap) => {
+    batch.set(
+      docSnap.ref,
+      {
+        ownerNickname,
+        ownerPhotoURL,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+  });
+  await batch.commit();
 };
 
 const retryProfileSyncWhenOnline = (user: User) => {
@@ -155,8 +247,52 @@ export const authApi = {
     if (!auth.currentUser) {
       throw new Error('로그인이 필요합니다.');
     }
-    await upsertUserProfile(auth.currentUser);
-    return toAuthUser(auth.currentUser);
+    const profile = await getUserProfile(auth.currentUser);
+    return toAuthUser(auth.currentUser, profile);
+  },
+
+  updateUserProfile: async (data: {
+    nickname: string;
+    photoURL?: string | null;
+  }) => {
+    if (!auth.currentUser) {
+      throw new Error('로그인이 필요합니다.');
+    }
+    const userRef = doc(db, 'users', auth.currentUser.uid);
+    const payload = {
+      nickname: data.nickname,
+      photoURL: data.photoURL ?? null,
+      updatedAt: serverTimestamp(),
+    };
+    await setDoc(userRef, payload, { merge: true });
+    updateShareLinksForOwner(
+      auth.currentUser.uid,
+      data.nickname,
+      data.photoURL ?? null,
+    ).catch((error) => {
+      console.error('Failed to sync share links:', error);
+    });
+
+    const { user, setUser } = useAuthStore.getState();
+    if (user) {
+      setUser({
+        ...user,
+        nickname: data.nickname,
+        photoURL: data.photoURL ?? null,
+      });
+    }
+
+    return payload;
+  },
+
+  ensureNickname: async () => {
+    if (!auth.currentUser) {
+      return null;
+    }
+    const profile = await getUserProfile(auth.currentUser);
+    const { setUser } = useAuthStore.getState();
+    setUser(toAuthUser(auth.currentUser, profile));
+    return profile;
   },
 
   hydrateStoreFromAuth: () => {
@@ -169,13 +305,17 @@ export const authApi = {
     return onAuthStateChanged(auth, (user) => {
       if (user) {
         setUser(toAuthUser(user));
-        upsertUserProfile(user).catch((error) => {
-          if (isFirestoreOfflineError(error)) {
-            retryProfileSyncWhenOnline(user);
-            return;
-          }
-          console.error('Failed to sync user profile:', error);
-        });
+        getUserProfile(user)
+          .then((profile) => {
+            setUser(toAuthUser(user, profile));
+          })
+          .catch((error) => {
+            if (isFirestoreOfflineError(error)) {
+              retryProfileSyncWhenOnline(user);
+              return;
+            }
+            console.error('Failed to sync user profile:', error);
+          });
       } else {
         setUser(null);
       }

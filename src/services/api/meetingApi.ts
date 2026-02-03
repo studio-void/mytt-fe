@@ -1,4 +1,5 @@
 import { addMinutes } from 'date-fns';
+import type { User } from 'firebase/auth';
 import {
   Timestamp,
   collection,
@@ -35,6 +36,7 @@ interface ParticipantDoc {
   uid: string;
   email: string | null;
   displayName: string | null;
+  nickname: string | null;
   photoURL: string | null;
   joinedAt?: Timestamp;
 }
@@ -66,6 +68,48 @@ const ensureUser = () => {
     throw new Error('로그인이 필요합니다.');
   }
   return auth.currentUser;
+};
+
+const buildFallbackNickname = (user: User) =>
+  user.email ?? user.displayName ?? null;
+
+const resolveParticipantProfile = async (user: User): Promise<ParticipantDoc> => {
+  const userRef = doc(db, 'users', user.uid);
+  const snapshot = await getDoc(userRef);
+  const data = snapshot.exists()
+    ? (snapshot.data() as { nickname?: string | null; photoURL?: string | null })
+    : null;
+  const nickname = data?.nickname ?? buildFallbackNickname(user);
+  const photoURL = data?.photoURL ?? user.photoURL ?? null;
+
+  const needsNickname = !data?.nickname && nickname;
+  const needsPhotoURL = !data?.photoURL && photoURL;
+  if (!snapshot.exists() || needsNickname || needsPhotoURL) {
+    await setDoc(
+      userRef,
+      {
+        ...(snapshot.exists()
+          ? {}
+          : {
+              uid: user.uid,
+              email: user.email,
+              displayName: user.displayName,
+            }),
+        ...(needsNickname ? { nickname } : {}),
+        ...(needsPhotoURL ? { photoURL } : {}),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+  }
+
+  return {
+    uid: user.uid,
+    email: user.email,
+    displayName: user.displayName,
+    nickname,
+    photoURL,
+  };
 };
 
 const generateInviteCode = () => {
@@ -318,12 +362,8 @@ export const meetingApi = {
       createdAt: serverTimestamp(),
     });
 
-    await upsertParticipant(meetingRef.id, {
-      uid: user.uid,
-      email: user.email,
-      displayName: user.displayName,
-      photoURL: user.photoURL,
-    });
+    const participantProfile = await resolveParticipantProfile(user);
+    await upsertParticipant(meetingRef.id, participantProfile);
     const spansMonth =
       startDate.getFullYear() !== endDate.getFullYear() ||
       startDate.getMonth() !== endDate.getMonth();
@@ -397,12 +437,8 @@ export const meetingApi = {
       throw new Error('약속을 찾을 수 없습니다.');
     }
 
-    await upsertParticipant(meeting.id, {
-      uid: user.uid,
-      email: user.email,
-      displayName: user.displayName,
-      photoURL: user.photoURL,
-    });
+    const participantProfile = await resolveParticipantProfile(user);
+    await upsertParticipant(meeting.id, participantProfile);
     const existingBlocks = await getExistingManualBlocks(meeting.id, user.uid);
     await upsertAvailability(
       meeting.id,
@@ -465,6 +501,57 @@ export const meetingApi = {
     const participants = snapshot.docs.map(
       (docSnap) => docSnap.data() as ParticipantDoc,
     );
+
+    const missingProfiles = participants.filter(
+      (participant) => !participant.nickname || !participant.photoURL,
+    );
+    if (missingProfiles.length > 0) {
+      const profileSnapshots = await Promise.all(
+        missingProfiles.map((participant) =>
+          getDoc(doc(db, 'users', participant.uid)),
+        ),
+      );
+      const batch = writeBatch(db);
+      const currentUid = auth.currentUser?.uid;
+      let hasBatchUpdates = false;
+      missingProfiles.forEach((participant, index) => {
+        const profileSnap = profileSnapshots[index];
+        if (!profileSnap.exists()) return;
+        const profile = profileSnap.data() as {
+          nickname?: string | null;
+          photoURL?: string | null;
+          email?: string | null;
+          displayName?: string | null;
+        };
+        const nickname =
+          participant.nickname ??
+          profile.nickname ??
+          profile.email ??
+          profile.displayName ??
+          participant.email ??
+          participant.displayName ??
+          null;
+        const photoURL =
+          participant.photoURL ?? profile.photoURL ?? null;
+        participant.nickname = nickname;
+        participant.photoURL = photoURL;
+        if (currentUid && participant.uid === currentUid) {
+          hasBatchUpdates = true;
+          batch.set(
+            doc(db, 'meetings', meeting.id, 'participants', participant.uid),
+            {
+              nickname,
+              photoURL,
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true },
+          );
+        }
+      });
+      if (hasBatchUpdates) {
+        await batch.commit();
+      }
+    }
     return { data: participants };
   },
 

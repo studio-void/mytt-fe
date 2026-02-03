@@ -28,6 +28,8 @@ export interface ShareLink {
   id: string;
   ownerUid: string;
   ownerEmail: string;
+  ownerNickname?: string | null;
+  ownerPhotoURL?: string | null;
   linkId: string;
   privacyLevel: PrivacyLevel;
   audience: SharingAudience;
@@ -85,6 +87,41 @@ const generateLinkId = () => {
     result += chars[Math.floor(Math.random() * chars.length)];
   }
   return result;
+};
+
+const getOwnerProfile = async (
+  ownerUid: string,
+  fallbackEmail?: string | null,
+) => {
+  try {
+    const snapshot = await getDoc(doc(db, 'users', ownerUid));
+    if (!snapshot.exists()) {
+      return {
+        ownerNickname: fallbackEmail ?? null,
+        ownerPhotoURL: null,
+      };
+    }
+    const data = snapshot.data() as {
+      nickname?: string | null;
+      photoURL?: string | null;
+      email?: string | null;
+      displayName?: string | null;
+    };
+    const ownerNickname =
+      data.nickname ?? data.email ?? data.displayName ?? fallbackEmail ?? null;
+    return {
+      ownerNickname,
+      ownerPhotoURL: data.photoURL ?? null,
+    };
+  } catch (error) {
+    if (isFirestorePermissionError(error)) {
+      return {
+        ownerNickname: fallbackEmail ?? null,
+        ownerPhotoURL: null,
+      };
+    }
+    throw error;
+  }
 };
 
 const mapEventForPrivacy = (
@@ -276,10 +313,13 @@ export const sharingApi = {
       .map((email) => normalizeEmail(email))
       .filter(Boolean);
 
+    const ownerProfile = await getOwnerProfile(user.uid, user.email);
     const payload: ShareLink = {
       id: linkDocId,
       ownerUid: user.uid,
       ownerEmail: normalizeEmail(user.email),
+      ownerNickname: ownerProfile.ownerNickname,
+      ownerPhotoURL: ownerProfile.ownerPhotoURL,
       linkId: normalizedLinkId,
       privacyLevel: data.privacyLevel,
       audience: data.audience,
@@ -322,12 +362,15 @@ export const sharingApi = {
       .map((email) => normalizeEmail(email))
       .filter(Boolean);
 
+    const ownerProfile = await getOwnerProfile(user.uid, user.email);
     await setDoc(
       doc(db, SHARE_LINKS_COLLECTION, linkDocId),
       {
         privacyLevel: data.privacyLevel,
         audience: data.audience,
         allowedEmails: normalizedEmails,
+        ownerNickname: ownerProfile.ownerNickname,
+        ownerPhotoURL: ownerProfile.ownerPhotoURL,
         updatedAt: serverTimestamp(),
       },
       { merge: true },
@@ -341,6 +384,8 @@ export const sharingApi = {
         privacyLevel: data.privacyLevel,
         audience: data.audience,
         allowedEmails: normalizedEmails,
+        ownerNickname: ownerProfile.ownerNickname,
+        ownerPhotoURL: ownerProfile.ownerPhotoURL,
       },
     };
   },
@@ -491,9 +536,22 @@ export const sharingApi = {
       .filter((event) => event.endTime.toDate() >= start)
       .map((event) => mapEventForPrivacy(event, link.privacyLevel));
 
+    let ownerNickname = link.ownerNickname ?? null;
+    let ownerPhotoURL = link.ownerPhotoURL ?? null;
+    if (!ownerNickname || !ownerPhotoURL) {
+      const ownerProfile = await getOwnerProfile(
+        link.ownerUid,
+        link.ownerEmail,
+      );
+      ownerNickname = ownerNickname ?? ownerProfile.ownerNickname;
+      ownerPhotoURL = ownerPhotoURL ?? ownerProfile.ownerPhotoURL;
+    }
+
     return {
       data: {
         userEmail: link.ownerEmail,
+        userNickname: ownerNickname ?? link.ownerEmail,
+        userPhotoURL: ownerPhotoURL ?? null,
         privacyLevel: link.privacyLevel,
         audience: link.audience,
         linkId: link.linkId,

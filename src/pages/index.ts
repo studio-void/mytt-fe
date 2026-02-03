@@ -10,3 +10,4 @@ export * from './meeting/meeting-list-page';
 export * from './schedule/calendar-page';
 export * from './schedule/share-schedule-page';
 export * from './schedule/view-schedule-page';
+export * from './settings/settings-page';

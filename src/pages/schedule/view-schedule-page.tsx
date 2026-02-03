@@ -24,6 +24,8 @@ interface ScheduleEvent {
 interface ScheduleData {
   id?: string;
   userEmail?: string;
+  userNickname?: string;
+  userPhotoURL?: string | null;
   privacyLevel?: 'busy_only' | 'basic_info' | 'full_details';
   events?: ScheduleEvent[];
 }
@@ -180,10 +182,28 @@ export function ViewSchedulePage() {
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold mb-1">
-                {schedule.userEmail}님의 일정
-              </h1>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3 mb-1">
+                <span className="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-gray-100 text-xs font-semibold text-gray-600">
+                  {schedule.userPhotoURL ? (
+                    <img
+                      src={schedule.userPhotoURL}
+                      alt={
+                        schedule.userNickname ?? schedule.userEmail ?? '사용자'
+                      }
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    (schedule.userNickname ?? schedule.userEmail ?? '사용자')
+                      .slice(0, 2)
+                      .toUpperCase()
+                  )}
+                </span>
+                <h1 className="text-2xl sm:text-3xl font-extrabold">
+                  {(schedule.userNickname ?? schedule.userEmail ?? '사용자') +
+                    '님의 일정'}
+                </h1>
+              </div>
+              <div className="flex items-center gap-2 mt-4">
                 {privacyLevel === 'busy_only' && (
                   <>
                     <IconLock size={16} className="text-gray-600" />
@@ -749,8 +769,11 @@ const splitEventsForDate = (events: ScheduleEvent[], date: Date) => {
   const timedEvents: ScheduleEvent[] = [];
 
   events.forEach((event) => {
-    const { start: eventStart, end: eventEnd, isAllDayLike } =
-      normalizeEventRange(event);
+    const {
+      start: eventStart,
+      end: eventEnd,
+      isAllDayLike,
+    } = normalizeEventRange(event);
     const spansFullDay =
       isAllDayLike || (eventStart <= dayStart && eventEnd >= dayEnd);
 

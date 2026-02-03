@@ -15,6 +15,9 @@ export const Header = forwardRef<
   const navigate = useNavigate();
   const { isAuthenticated, user, isAuthReady } = useAuthStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const displayName =
+    user?.nickname ?? user?.email ?? user?.displayName ?? '사용자';
+  const avatarFallback = displayName.slice(0, 2).toUpperCase();
 
   const handleLogout = () => {
     setIsMobileMenuOpen(false);
@@ -66,7 +69,23 @@ export const Header = forwardRef<
           <div className="hidden md:flex items-center gap-4">
             {isAuthenticated ? (
               <>
-                <span className="text-sm text-gray-600">{user?.email}</span>
+                <Link
+                  to="/settings"
+                  className="inline-flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900"
+                >
+                  <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-gray-100 text-xs font-semibold text-gray-600">
+                    {user?.photoURL ? (
+                      <img
+                        src={user.photoURL}
+                        alt={displayName}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      avatarFallback
+                    )}
+                  </span>
+                  <span>{displayName}님</span>
+                </Link>
                 <Button variant="outline" size="sm" onClick={handleLogout}>
                   <LogOut />
                   로그아웃
@@ -142,9 +161,26 @@ export const Header = forwardRef<
                 </Link>
 
                 <div className="pt-2 mt-2 border-t border-gray-100 flex items-center justify-between gap-3">
-                  <span className="text-sm text-gray-600 truncate">
-                    {user?.email}
-                  </span>
+                  <Link
+                    to="/settings"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="inline-flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900"
+                  >
+                    <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-gray-100 text-xs font-semibold text-gray-600">
+                      {user?.photoURL ? (
+                        <img
+                          src={user.photoURL}
+                          alt={displayName}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        avatarFallback
+                      )}
+                    </span>
+                    <span className="truncate max-w-[140px]">
+                      {displayName}
+                    </span>
+                  </Link>
                   <Button variant="outline" size="sm" onClick={handleLogout}>
                     <LogOut />
                     로그아웃

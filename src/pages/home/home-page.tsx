@@ -2,9 +2,11 @@ import { useEffect } from 'react';
 
 import { IconCalendar, IconShieldLock, IconUsers } from '@tabler/icons-react';
 import { useNavigate } from '@tanstack/react-router';
+import { ChevronRight } from 'lucide-react';
 
 import { Layout } from '@/components';
 import { Button } from '@/components/ui/button';
+import { authApi } from '@/services/api/authApi';
 import { useAuthStore } from '@/store/useAuthStore';
 
 export const HomePage: React.FC = () => {
@@ -13,15 +15,27 @@ export const HomePage: React.FC = () => {
 
   // 로그인하면 대시보드로 리다이렉트
   useEffect(() => {
-    if (isAuthReady && isAuthenticated) {
-      navigate({ to: '/dashboard' });
-    }
+    if (!isAuthReady || !isAuthenticated) return;
+    authApi
+      .ensureNickname()
+      .catch((error) => {
+        console.error('Failed to ensure nickname:', error);
+      })
+      .finally(() => {
+        navigate({ to: '/dashboard' });
+      });
   }, [isAuthenticated, isAuthReady, navigate]);
 
   return (
     <Layout disableHeaderHeight>
       <div className="max-w-4xl mx-auto py-20 sm:py-28 text-center">
-        <h1 className="text-4xl sm:text-6xl font-extrabold mb-4">MyTT</h1>
+        <h1 className="text-4xl sm:text-6xl font-extrabold mb-4">
+          <img
+            src="/MyTT.svg"
+            alt="MyTT"
+            className="h-12 md:h-16 lg:h-20 w-auto inline-block"
+          />
+        </h1>
         <p className="text-base sm:text-xl text-gray-600 mb-10 sm:mb-12 max-w-2xl mx-auto leading-relaxed">
           Google Calendar를 연동하여 팀과 함께 공통 일정을 찾고,
           <br />
@@ -34,6 +48,7 @@ export const HomePage: React.FC = () => {
           }
         >
           {isAuthenticated ? '대시보드' : '시작하기'}
+          <ChevronRight />
         </Button>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 mt-16 sm:mt-24">
