@@ -181,6 +181,8 @@ export function CalendarPage() {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
     null,
   );
+  const loadRange = getCalendarLoadRange(currentDate);
+  const loadRangeKey = `${loadRange.start.getTime()}-${loadRange.end.getTime()}`;
 
   useEffect(() => {
     if (isAuthReady && !isAuthenticated) {
@@ -196,7 +198,7 @@ export function CalendarPage() {
     if (selectedCalendars.length > 0) {
       loadCalendarEvents();
     }
-  }, [currentDate, selectedCalendars, viewMode]);
+  }, [loadRangeKey, selectedCalendars]);
 
   const loadCalendars = async () => {
     try {
@@ -223,7 +225,7 @@ export function CalendarPage() {
   const loadCalendarEvents = async () => {
     try {
       setLoading(true);
-      const { start, end } = getRangeForView(currentDate, viewMode);
+      const { start, end } = getCalendarLoadRange(currentDate);
       const response = await calendarApi.getEvents(start, end);
       // 필터링된 이벤트만 표시
       const filtered = (response.data || []).filter((event: any) =>
@@ -1285,6 +1287,36 @@ weekday는 ISO 기준 숫자(월=1 ... 일=7)로만 출력해.
     </Layout>
   );
 }
+
+const getCalendarLoadRange = (date: Date) => {
+  const monthStart = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    1,
+    0,
+    0,
+    0,
+    0,
+  );
+  const monthEnd = new Date(
+    date.getFullYear(),
+    date.getMonth() + 1,
+    0,
+    23,
+    59,
+    59,
+    999,
+  );
+  const weekStart = new Date(date);
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+  weekStart.setHours(0, 0, 0, 0);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  weekEnd.setHours(23, 59, 59, 999);
+  const start = weekStart < monthStart ? weekStart : monthStart;
+  const end = weekEnd > monthEnd ? weekEnd : monthEnd;
+  return { start, end };
+};
 
 const getRangeForView = (date: Date, viewMode: 'month' | 'week' | 'day') => {
   if (viewMode === 'day') {
