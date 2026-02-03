@@ -17,7 +17,7 @@ export function LoginPage() {
   }, [isAuthenticated, isAuthReady, navigate]);
 
   return (
-    <Layout>
+    <Layout disableHeaderHeight>
       <div className="flex items-center justify-center min-h-screen">
         <div className="rounded-lg p-8 max-w-xl w-full">
           <div className="text-center mb-8">

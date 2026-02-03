@@ -181,8 +181,8 @@ export function ShareSchedulePage() {
 
   if (loading && links.length === 0) {
     return (
-      <Layout>
-        <div className="mx-auto py-8">
+      <Layout disableHeaderHeight>
+        <div className="mx-auto py-16">
           <div className="text-center">로딩 중...</div>
         </div>
       </Layout>
@@ -190,8 +190,8 @@ export function ShareSchedulePage() {
   }
 
   return (
-    <Layout>
-      <div className="mx-auto py-8">
+    <Layout disableHeaderHeight>
+      <div className="mx-auto py-16">
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl font-extrabold mb-2">
             일정 공유

@@ -44,7 +44,7 @@ export function JoinMeetingPage() {
   };
 
   return (
-    <Layout>
+    <Layout disableHeaderHeight>
       <div className="flex items-center justify-center min-h-screen">
         <div className="rounded-lg p-8 max-w-md w-full">
           <h1 className="text-3xl font-extrabold mb-2">약속 참여하기</h1>

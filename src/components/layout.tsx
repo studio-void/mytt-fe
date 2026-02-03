@@ -29,7 +29,10 @@ export const Layout: React.FC<
         style={{ paddingTop: disableHeaderHeight ? 0 : headerHeight }}
         className="w-full"
       >
-        <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div
+          className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8"
+          style={{ minHeight: `calc(100vh - ${headerHeight}px - 3rem)` }}
+        >
           {children}
         </div>
       </main>

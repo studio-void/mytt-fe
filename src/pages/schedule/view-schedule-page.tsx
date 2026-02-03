@@ -119,8 +119,8 @@ export function ViewSchedulePage() {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="mx-auto py-8">
+      <Layout disableHeaderHeight>
+        <div className="mx-auto py-16">
           <div className="text-center">로딩 중...</div>
         </div>
       </Layout>
@@ -129,8 +129,8 @@ export function ViewSchedulePage() {
 
   if (accessDenied) {
     return (
-      <Layout>
-        <div className="mx-auto py-8">
+      <Layout disableHeaderHeight>
+        <div className="mx-auto py-16">
           <div className="text-center">
             <p className="text-lg font-semibold mb-2">접근이 제한되었습니다.</p>
             <p className="text-gray-500">
@@ -144,8 +144,8 @@ export function ViewSchedulePage() {
 
   if (!schedule) {
     return (
-      <Layout>
-        <div className="mx-auto py-8">
+      <Layout disableHeaderHeight>
+        <div className="mx-auto py-16">
           <div className="text-center">일정을 찾을 수 없습니다.</div>
         </div>
       </Layout>
@@ -153,8 +153,8 @@ export function ViewSchedulePage() {
   }
 
   return (
-    <Layout>
-      <div className="mx-auto py-8">
+    <Layout disableHeaderHeight>
+      <div className="mx-auto py-16">
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>

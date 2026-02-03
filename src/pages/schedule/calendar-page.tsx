@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { useNavigate } from '@tanstack/react-router';
-import { RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Layout } from '@/components';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { calendarApi } from '@/services/api/calendarApi';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -180,8 +181,8 @@ export function CalendarPage() {
   );
 
   return (
-    <Layout>
-      <div className="mx-auto py-8">
+    <Layout disableHeaderHeight>
+      <div className="mx-auto py-16">
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <h1 className="text-2xl sm:text-3xl font-extrabold">일정 관리</h1>
@@ -657,10 +658,12 @@ export function CalendarPage() {
                     <button
                       type="button"
                       onClick={() => setIsCalendarPickerOpen((prev) => !prev)}
-                      className="text-xs text-gray-500 flex items-center gap-1"
+                      className="text-xs font-semibold text-gray-500 flex items-center gap-1"
                     >
-                      {isCalendarPickerOpen ? '접기' : '더 보기'}
-                      <span>{isCalendarPickerOpen ? '▲' : '▼'}</span>
+                      {isCalendarPickerOpen ? '접기' : '더보기'}
+                      <span>
+                        {isCalendarPickerOpen ? <ChevronUp /> : <ChevronDown />}
+                      </span>
                     </button>
                   )}
                 </div>
@@ -670,19 +673,25 @@ export function CalendarPage() {
                       key={calendar.id}
                       className="flex items-center gap-2 cursor-pointer text-sm"
                     >
-                      <input
-                        type="checkbox"
+                      <Checkbox
+                        id={`calendar-${calendar.id}`}
                         checked={selectedCalendars.includes(calendar.id)}
-                        onChange={() => toggleCalendar(calendar.id)}
-                        className="w-4 h-4"
+                        onCheckedChange={() => toggleCalendar(calendar.id)}
+                        style={
+                          calendar.color
+                            ? ({
+                                '--checkbox-color': calendar.color,
+                              } as React.CSSProperties)
+                            : undefined
+                        }
                       />
                       <div className="flex items-center gap-2">
-                        {calendar.color && (
+                        {/* {calendar.color && (
                           <span
                             className="inline-block h-2.5 w-2.5 rounded-full"
                             style={{ backgroundColor: calendar.color }}
                           />
-                        )}
+                        )} */}
                         <span className="text-gray-700">
                           {calendar.title}
                           {calendar.isPrimary && (

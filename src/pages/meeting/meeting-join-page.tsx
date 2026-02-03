@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { useNavigate, useParams } from '@tanstack/react-router';
-import { RefreshCw } from 'lucide-react';
+import { Copy, RefreshCw, Trash } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Layout } from '@/components';
@@ -348,8 +348,8 @@ export function MeetingJoinPage() {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="mx-auto py-8">
+      <Layout disableHeaderHeight>
+        <div className="mx-auto py-16">
           <div className="text-center">로딩 중...</div>
         </div>
       </Layout>
@@ -358,8 +358,8 @@ export function MeetingJoinPage() {
 
   if (!meeting) {
     return (
-      <Layout>
-        <div className="mx-auto py-8">
+      <Layout disableHeaderHeight>
+        <div className="mx-auto py-16">
           <div className="text-center">약속을 찾을 수 없습니다.</div>
         </div>
       </Layout>
@@ -367,8 +367,8 @@ export function MeetingJoinPage() {
   }
 
   return (
-    <Layout>
-      <div className="mx-auto py-8">
+    <Layout disableHeaderHeight>
+      <div className="mx-auto py-16">
         {/* 미팅 정보 */}
         <div className="border border-gray-200 rounded-lg p-8 mb-6">
           <div className="flex justify-between items-start mb-4">
@@ -387,6 +387,7 @@ export function MeetingJoinPage() {
             </div>
             <div className="flex gap-2">
               <Button onClick={copyInviteLink} variant="outline">
+                <Copy />
                 링크 복사
               </Button>
               {isAuthenticated && (
@@ -401,6 +402,7 @@ export function MeetingJoinPage() {
               )}
               {isAuthenticated && user?.uid === meeting.hostUid && (
                 <Button variant="destructive" onClick={handleDeleteMeeting}>
+                  <Trash />
                   약속 삭제
                 </Button>
               )}

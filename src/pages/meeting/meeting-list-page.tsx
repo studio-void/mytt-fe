@@ -61,8 +61,8 @@ export function MeetingListPage() {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="mx-auto py-8">
+      <Layout disableHeaderHeight>
+        <div className="mx-auto py-16">
           <div className="text-center">로딩 중...</div>
         </div>
       </Layout>
@@ -70,8 +70,8 @@ export function MeetingListPage() {
   }
 
   return (
-    <Layout>
-      <div className="mx-auto py-8">
+    <Layout disableHeaderHeight>
+      <div className="mx-auto py-16">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-extrabold mb-1">내 약속</h1>

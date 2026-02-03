@@ -19,7 +19,7 @@ export const HomePage: React.FC = () => {
   }, [isAuthenticated, isAuthReady, navigate]);
 
   return (
-    <Layout>
+    <Layout disableHeaderHeight>
       <div className="max-w-4xl mx-auto py-20 sm:py-28 text-center">
         <h1 className="text-4xl sm:text-6xl font-extrabold mb-4">MyTT</h1>
         <p className="text-base sm:text-xl text-gray-600 mb-10 sm:mb-12 max-w-2xl mx-auto leading-relaxed">
