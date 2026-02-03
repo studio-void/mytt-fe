@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PropsWithChildren } from 'react';
 
-import { useRouterState } from '@tanstack/react-router';
+import { useLocation } from '@tanstack/react-router';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import { Footer } from './footer';
@@ -12,7 +12,7 @@ export const Layout: React.FC<
 > = ({ children, disableHeaderHeight }) => {
   const headerRef = useRef<HTMLElementTagNameMap['header']>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
-  const location = useRouterState({ select: (state) => state.location });
+  const location = useLocation();
 
   useEffect(() => {
     const headerEl = headerRef.current;
@@ -39,7 +39,7 @@ export const Layout: React.FC<
         >
           <AnimatePresence mode="wait">
             <motion.div
-              key={`${location.pathname}${location.search}`}
+              key={`${location.pathname}${location.searchStr}`}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}

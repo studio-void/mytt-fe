@@ -173,12 +173,12 @@ export function ShareSchedulePage() {
     }
   };
 
-  const handleCopyLink = (link: ShareLink) => {
-    navigator.clipboard.writeText(link.url);
+  const handleCopyLink = (url: string, linkId: string) => {
+    navigator.clipboard.writeText(url);
     toast.success('공유 링크가 복사되었습니다!');
-    setCopiedLinkId(link.id);
+    setCopiedLinkId(linkId);
     window.setTimeout(() => {
-      setCopiedLinkId((current) => (current === link.id ? null : current));
+      setCopiedLinkId((current) => (current === linkId ? null : current));
     }, 1200);
   };
 
@@ -404,7 +404,7 @@ export function ShareSchedulePage() {
                       />
                       <button
                         type="button"
-                        onClick={() => handleCopyLink(link)}
+                        onClick={() => handleCopyLink(link.url, link.id)}
                         className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
                         aria-label="링크 복사"
                       >
