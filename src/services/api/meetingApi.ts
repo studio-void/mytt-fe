@@ -74,11 +74,16 @@ const ensureUser = () => {
 const buildFallbackNickname = (user: User) =>
   user.displayName ?? user.email ?? null;
 
-const resolveParticipantProfile = async (user: User): Promise<ParticipantDoc> => {
+const resolveParticipantProfile = async (
+  user: User,
+): Promise<ParticipantDoc> => {
   const userRef = doc(db, 'users', user.uid);
   const snapshot = await getDoc(userRef);
   const data = snapshot.exists()
-    ? (snapshot.data() as { nickname?: string | null; photoURL?: string | null })
+    ? (snapshot.data() as {
+        nickname?: string | null;
+        photoURL?: string | null;
+      })
     : null;
   const nickname = data?.nickname ?? buildFallbackNickname(user);
   const photoURL = data?.photoURL ?? user.photoURL ?? null;
@@ -547,8 +552,7 @@ export const meetingApi = {
           participant.displayName ??
           participant.email ??
           null;
-        const photoURL =
-          participant.photoURL ?? profile.photoURL ?? null;
+        const photoURL = participant.photoURL ?? profile.photoURL ?? null;
         participant.nickname = nickname;
         participant.photoURL = photoURL;
         if (currentUid && participant.uid === currentUid) {
@@ -641,7 +645,8 @@ export const meetingApi = {
     );
     const now = Date.now();
     const upcoming = meetings.filter(
-      (meeting) => meeting.endTime && new Date(meeting.endTime).getTime() >= now,
+      (meeting) =>
+        meeting.endTime && new Date(meeting.endTime).getTime() >= now,
     );
     const past = meetings.filter(
       (meeting) => meeting.endTime && new Date(meeting.endTime).getTime() < now,
@@ -666,10 +671,7 @@ export const meetingApi = {
   getJoinedMeetings: async () => {
     const user = ensureUser();
     const participantsSnap = await getDocs(
-      query(
-        collectionGroup(db, 'participants'),
-        where('uid', '==', user.uid),
-      ),
+      query(collectionGroup(db, 'participants'), where('uid', '==', user.uid)),
     );
 
     const meetingIds = Array.from(
@@ -693,7 +695,8 @@ export const meetingApi = {
 
     const now = Date.now();
     const upcoming = meetings.filter(
-      (meeting) => meeting.endTime && new Date(meeting.endTime).getTime() >= now,
+      (meeting) =>
+        meeting.endTime && new Date(meeting.endTime).getTime() >= now,
     );
     const past = meetings.filter(
       (meeting) => meeting.endTime && new Date(meeting.endTime).getTime() < now,

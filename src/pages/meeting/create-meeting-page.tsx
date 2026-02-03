@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 
 import { useNavigate } from '@tanstack/react-router';
+import { motion } from 'framer-motion';
 import { Plus, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-import { motion } from 'framer-motion';
 
 import { Layout } from '@/components';
 import { Button } from '@/components/ui/button';

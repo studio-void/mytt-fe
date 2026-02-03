@@ -2,7 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { useNavigate, useParams } from '@tanstack/react-router';
 import { motion } from 'framer-motion';
-import { Check, Copy, LogIn, LogOut, RefreshCw, Save, Trash } from 'lucide-react';
+import {
+  Check,
+  Copy,
+  LogIn,
+  LogOut,
+  RefreshCw,
+  Save,
+  Trash,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Layout } from '@/components';

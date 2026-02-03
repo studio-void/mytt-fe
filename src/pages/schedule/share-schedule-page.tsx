@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { IconCalendar, IconLink } from '@tabler/icons-react';
 import { useNavigate } from '@tanstack/react-router';
+import { motion } from 'framer-motion';
 import { Check, Copy, Edit, Pencil, Plus, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-import { motion } from 'framer-motion';
 
 import { Layout } from '@/components';
 import { Button } from '@/components/ui/button';

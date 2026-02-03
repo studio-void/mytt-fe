@@ -31,7 +31,9 @@ export function SettingsPage() {
     try {
       setLoading(true);
       const profile = await authApi.getProfile();
-      setNickname(profile.nickname ?? profile.displayName ?? profile.email ?? '');
+      setNickname(
+        profile.nickname ?? profile.displayName ?? profile.email ?? '',
+      );
       setPhotoURL(profile.photoURL ?? '');
       setEmail(profile.email ?? '');
     } catch (error) {
@@ -115,9 +117,7 @@ export function SettingsPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
-              닉네임
-            </label>
+            <label className="text-sm font-medium text-gray-700">닉네임</label>
             <Input
               value={nickname}
               onChange={(event) => setNickname(event.target.value)}

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 
 import { useNavigate } from '@tanstack/react-router';
-import { Check, Copy, Plus } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { Check, Copy, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Layout } from '@/components';
@@ -156,7 +156,9 @@ export function MeetingListPage() {
                           <span>초대 코드: {meeting.inviteCode}</span>
                           <button
                             type="button"
-                            onClick={() => handleCopyInviteLink(meeting.inviteCode)}
+                            onClick={() =>
+                              handleCopyInviteLink(meeting.inviteCode)
+                            }
                             className="text-gray-400 hover:text-gray-700"
                             aria-label="초대 링크 복사"
                           >
