@@ -4,6 +4,7 @@ import {
   type UserCredential,
   browserLocalPersistence,
   getRedirectResult,
+  indexedDBLocalPersistence,
   onAuthStateChanged,
   reauthenticateWithPopup,
   reauthenticateWithRedirect,
@@ -198,21 +199,34 @@ const retryProfileSyncWhenOnline = (user: User) => {
   window.addEventListener('online', handler);
 };
 
+const isIOSDevice = () => {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent.toLowerCase();
+  const isIOS = /iphone|ipad|ipod/.test(ua);
+  const isIPadOS = /macintosh/.test(ua) && 'ontouchend' in window;
+  return isIOS || isIPadOS;
+};
+
 const isStandalonePwa = () => {
   if (typeof window === 'undefined') return false;
   const standaloneMatch =
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(display-mode: standalone)').matches;
   const iosStandalone =
-    'standalone' in navigator && Boolean((navigator as { standalone?: boolean }).standalone);
+    'standalone' in navigator &&
+    Boolean((navigator as { standalone?: boolean }).standalone);
   return Boolean(standaloneMatch || iosStandalone);
 };
 
 const shouldUseRedirect = () => isStandalonePwa();
+const getPersistence = () =>
+  isStandalonePwa() && isIOSDevice()
+    ? indexedDBLocalPersistence
+    : browserLocalPersistence;
 
 export const authApi = {
   googleLogin: async () => {
-    await setPersistence(auth, browserLocalPersistence);
+    await setPersistence(auth, getPersistence());
     const provider = buildProvider();
     if (shouldUseRedirect()) {
       await signInWithRedirect(auth, provider);
@@ -240,7 +254,7 @@ export const authApi = {
     onAuthStateChanged(auth, callback),
 
   completeRedirectSignIn: async () => {
-    await setPersistence(auth, browserLocalPersistence);
+    await setPersistence(auth, getPersistence());
     const result = await getRedirectResult(auth);
     if (!result) return null;
     const tokenData = extractAccessToken(
@@ -267,6 +281,7 @@ export const authApi = {
 
     const provider = buildProvider();
     if (shouldUseRedirect()) {
+      await setPersistence(auth, getPersistence());
       await reauthenticateWithRedirect(auth.currentUser, provider);
       throw new Error('리디렉트 인증이 필요합니다.');
     }
