@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
 
 import { useNavigate, useParams } from '@tanstack/react-router';
 import { motion } from 'framer-motion';
@@ -9,6 +9,7 @@ import {
   LogOut,
   RefreshCw,
   Save,
+  Sparkles,
   Trash,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -74,6 +75,18 @@ export function MeetingJoinPage() {
     x: number;
     y: number;
   } | null>(null);
+  const [recommendDuration, setRecommendDuration] = useState('60');
+  const [recommendations, setRecommendations] = useState<
+    Array<{
+      start: Date;
+      end: Date;
+      availableCount: number;
+      availability: number;
+    }>
+  >([]);
+  const [recommendationError, setRecommendationError] = useState<string | null>(
+    null,
+  );
   const [calendarEvents, setCalendarEvents] = useState<StoredEvent[]>([]);
   const [hoveredCalendarEvent, setHoveredCalendarEvent] = useState<{
     event: StoredEvent;
@@ -102,7 +115,6 @@ export function MeetingJoinPage() {
       description: meeting.description || 'MyTT에서 약속에 참여하세요!',
     });
   }, [meeting]);
-
 
   useEffect(() => {
     const stopDragging = () => setIsDragging(false);
@@ -461,6 +473,115 @@ export function MeetingJoinPage() {
     });
   };
 
+  const handleRecommendTime = () => {
+    if (!meetingRange) return;
+    const minutes = Number(recommendDuration);
+    if (!Number.isFinite(minutes) || minutes <= 0) {
+      setRecommendations([]);
+      setRecommendationError('유효한 시간을 입력해주세요.');
+      return;
+    }
+    if (participants.length === 0 || availabilitySlots.length === 0) {
+      setRecommendations([]);
+      setRecommendationError('참가자 정보가 없습니다.');
+      return;
+    }
+
+    const target = new Date();
+    const baseTime =
+      target < meetingRange.start
+        ? meetingRange.start
+        : target > meetingRange.end
+          ? meetingRange.end
+          : target;
+
+    const sortedStarts = availabilitySlots
+      .map((slot) => new Date(slot.startTime))
+      .sort((a, b) => a.getTime() - b.getTime());
+
+    const candidates: Array<{
+      start: Date;
+      end: Date;
+      availableCount: number;
+      availability: number;
+      distance: number;
+    }> = [];
+
+    sortedStarts.forEach((start) => {
+      if (start < meetingRange.start) return;
+      const end = addMinutes(start, minutes);
+      if (end > meetingRange.end) return;
+      if (!isWithinActiveHours(start, end)) return;
+
+      const availableCount = getAvailableCountForRange(
+        start,
+        end,
+        participants,
+        availabilityDocsMap,
+      );
+      const availability = participants.length
+        ? availableCount / participants.length
+        : 0;
+      const distance = Math.abs(start.getTime() - baseTime.getTime());
+
+      candidates.push({
+        start,
+        end,
+        availableCount,
+        availability,
+        distance,
+      });
+    });
+
+    if (candidates.length === 0) {
+      setRecommendations([]);
+      setRecommendationError('추천할 수 있는 시간이 없습니다.');
+      return;
+    }
+
+    const sorted = candidates.sort((a, b) => {
+      if (b.availableCount !== a.availableCount) {
+        return b.availableCount - a.availableCount;
+      }
+      if (a.distance !== b.distance) {
+        return a.distance - b.distance;
+      }
+      return a.start.getTime() - b.start.getTime();
+    });
+
+    const selected: Array<{
+      start: Date;
+      end: Date;
+      availableCount: number;
+      availability: number;
+    }> = [];
+
+    sorted.forEach((item) => {
+      if (selected.length >= 3) return;
+      const overlaps = selected.some(
+        (picked) => item.start < picked.end && item.end > picked.start,
+      );
+      if (overlaps) return;
+      selected.push({
+        start: item.start,
+        end: item.end,
+        availableCount: item.availableCount,
+        availability: item.availability,
+      });
+    });
+
+    setRecommendations(selected);
+    setRecommendationError(null);
+  };
+
+  const handleRecommendDurationChange = (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    setRecommendDuration(event.target.value);
+    setRecommendations([]);
+    setRecommendationError(null);
+  };
+
   if (loading) {
     return (
       <Layout disableHeaderHeight>
@@ -623,6 +744,64 @@ export function MeetingJoinPage() {
             </h2>
             {meetingRange && weekStart && (
               <div className="space-y-4">
+                <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50/60 p-4 sm:flex-row sm:items-end sm:justify-between">
+                  <div className="space-y-2">
+                    <div className="text-sm font-semibold text-gray-700">
+                      스마트 약속 추천
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                      <label className="text-gray-600">
+                        시간(분)
+                        <input
+                          type="number"
+                          min={15}
+                          step={15}
+                          value={recommendDuration}
+                          onChange={handleRecommendDurationChange}
+                          className="ml-2 w-24 rounded-md border border-gray-200 px-2 py-1 text-sm"
+                        />
+                      </label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleRecommendTime}
+                      >
+                        <Sparkles className="h-4 w-4" />
+                        추천
+                      </Button>
+                    </div>
+                  </div>
+                  {recommendations.length === 0 && recommendationError && (
+                    <div className="text-xs text-red-500">
+                      {recommendationError}
+                    </div>
+                  )}
+                </div>
+                {recommendations.length > 0 && (
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {recommendations.map((rec) => (
+                      <div
+                        key={rec.start.toISOString()}
+                        className="rounded-md border border-blue-200 bg-white px-3 py-2 text-xs text-gray-700"
+                      >
+                        <div className="font-semibold text-blue-700">
+                          <span className="inline-flex items-center gap-1">
+                            <Sparkles className="h-3.5 w-3.5" /> 추천 시간
+                          </span>
+                        </div>
+                        <div>
+                          {formatDate(rec.start.toISOString())}{' '}
+                          {formatTime(rec.start.toISOString())} -{' '}
+                          {formatTime(rec.end.toISOString())}
+                        </div>
+                        <div className="text-[11px] text-gray-500">
+                          가능 {rec.availableCount}/{participants.length} (
+                          {Math.round(rec.availability * 100)}%)
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="text-sm text-gray-600">
                     파란색이 진할수록 더 많은 참가자가 가능한 시간입니다.
@@ -694,8 +873,37 @@ export function MeetingJoinPage() {
                       {availabilityWeekDays.map((day) => (
                         <div
                           key={day.toISOString()}
-                          className="border-l border-gray-100"
+                          className="relative border-l border-gray-100"
                         >
+                          {recommendations.map((rec) => {
+                            if (!isSameDay(rec.start, day)) return null;
+                            const durationMinutes =
+                              (rec.end.getTime() - rec.start.getTime()) / 60000;
+                            const offsetMinutes =
+                              rec.start.getHours() * 60 +
+                              rec.start.getMinutes();
+                            const height =
+                              (durationMinutes / AVAIL_SLOT_MINUTES) *
+                              AVAIL_SLOT_HEIGHT;
+                            const top =
+                              (offsetMinutes / AVAIL_SLOT_MINUTES) *
+                              AVAIL_SLOT_HEIGHT;
+
+                            return (
+                              <div
+                                key={rec.start.toISOString()}
+                                className="absolute left-0 right-0 z-10 pointer-events-none"
+                                style={{ top, height }}
+                              >
+                                <div className="relative h-full w-full rounded-md border-2 border-blue-500/70 bg-blue-50/20 shadow-[0_0_0_1px_rgba(59,130,246,0.15)_inset]">
+                                  <div className="absolute right-1 top-1 flex items-center gap-1 rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 shadow">
+                                    <Sparkles className="h-3 w-3" />
+                                    추천 시간
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                           {AVAIL_TIME_SLOTS.map((slotMinutes) => {
                             const slotStart = addMinutes(day, slotMinutes);
                             const slotEnd = addMinutes(
@@ -715,7 +923,6 @@ export function MeetingJoinPage() {
                               ? getAvailabilityColor(availability)
                               : '#f8fafc';
                             const isOptimal = slot?.isOptimal;
-
                             return (
                               <div
                                 key={`${day.toISOString()}-${slotMinutes}`}
@@ -1121,6 +1328,11 @@ const buildWeekDays = (weekStart: Date) =>
     return next;
   });
 
+const isSameDay = (left: Date, right: Date) =>
+  left.getFullYear() === right.getFullYear() &&
+  left.getMonth() === right.getMonth() &&
+  left.getDate() === right.getDate();
+
 const getMeetingRange = (startTime: string, endTime: string) => {
   const start = new Date(startTime);
   const end = new Date(endTime);
@@ -1227,6 +1439,42 @@ const getAvailabilityColor = (availability: number) => {
   const clamped = Math.min(1, Math.max(0, availability));
   const lightness = 94 - clamped * 22;
   return `hsl(210, 85%, ${lightness}%)`;
+};
+
+const isWithinActiveHours = (start: Date, end: Date) => {
+  const startMinutes = start.getHours() * 60 + start.getMinutes();
+  const endMinutesRaw = end.getHours() * 60 + end.getMinutes();
+  const isNextDay =
+    start.getFullYear() !== end.getFullYear() ||
+    start.getMonth() !== end.getMonth() ||
+    start.getDate() !== end.getDate();
+  const endMinutes = isNextDay && endMinutesRaw === 0 ? 24 * 60 : endMinutesRaw;
+  const ACTIVE_START = 9 * 60;
+  const ACTIVE_END = 24 * 60;
+  return startMinutes >= ACTIVE_START && endMinutes <= ACTIVE_END;
+};
+
+const getAvailableCountForRange = (
+  start: Date,
+  end: Date,
+  participants: ParticipantInfo[],
+  availabilityDocs: Map<string, AvailabilityDoc>,
+) => {
+  let availableCount = 0;
+  participants.forEach((participant) => {
+    const doc = availabilityDocs.get(participant.uid);
+    if (!doc) {
+      availableCount += 1;
+      return;
+    }
+    const isBusy = doc.busyBlocks.some((block) =>
+      blocksOverlap(start, end, block),
+    );
+    if (!isBusy) {
+      availableCount += 1;
+    }
+  });
+  return availableCount;
 };
 
 const getSlotAvailabilityDetails = (
