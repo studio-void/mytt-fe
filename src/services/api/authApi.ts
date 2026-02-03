@@ -239,11 +239,7 @@ const shouldUseRedirect = () => isStandalonePwa();
 const setBestPersistence = async () => {
   const candidates =
     isStandalonePwa() && isIOSDevice()
-      ? [
-          browserLocalPersistence,
-          indexedDBLocalPersistence,
-          browserSessionPersistence,
-        ]
+      ? [browserLocalPersistence, indexedDBLocalPersistence]
       : [
           indexedDBLocalPersistence,
           browserLocalPersistence,
@@ -296,7 +292,7 @@ export const authApi = {
     const result = await getRedirectResult(auth);
     if (!result) {
       const user = await new Promise<User | null>((resolve) => {
-        const timeout = window.setTimeout(() => resolve(auth.currentUser), 1500);
+        const timeout = window.setTimeout(() => resolve(auth.currentUser), 5000);
         const unsubscribe = onAuthStateChanged(auth, (authUser) => {
           window.clearTimeout(timeout);
           unsubscribe();

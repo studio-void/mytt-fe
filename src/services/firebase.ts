@@ -1,5 +1,10 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import {
+  browserLocalPersistence,
+  browserSessionPersistence,
+  indexedDBLocalPersistence,
+  initializeAuth,
+} from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -18,7 +23,35 @@ if (!firebaseConfig.apiKey || !firebaseConfig.authDomain) {
 
 const app = initializeApp(firebaseConfig);
 
-export const auth = getAuth(app);
+const isIOSDevice = () => {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent.toLowerCase();
+  const isIOS = /iphone|ipad|ipod/.test(ua);
+  const isIPadOS = /macintosh/.test(ua) && 'ontouchend' in window;
+  return isIOS || isIPadOS;
+};
+
+const isStandalonePwa = () => {
+  if (typeof window === 'undefined') return false;
+  const standaloneMatch =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(display-mode: standalone)').matches;
+  const iosStandalone =
+    'standalone' in navigator &&
+    Boolean((navigator as { standalone?: boolean }).standalone);
+  return Boolean(standaloneMatch || iosStandalone);
+};
+
+const persistence =
+  isStandalonePwa() && isIOSDevice()
+    ? [browserLocalPersistence, indexedDBLocalPersistence]
+    : [
+        indexedDBLocalPersistence,
+        browserLocalPersistence,
+        browserSessionPersistence,
+      ];
+
+export const auth = initializeAuth(app, { persistence });
 export const db = getFirestore(app);
 
 export const isFirestoreOfflineError = (error: unknown) => {
