@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { useNavigate } from '@tanstack/react-router';
+import { Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Layout } from '@/components';
@@ -70,6 +71,7 @@ export function JoinMeetingPage() {
 
             <div className="flex gap-4">
               <Button type="submit" disabled={loading} className="flex-1">
+                <Check />
                 {loading ? '참여 중...' : '참여하기'}
               </Button>
               <Button

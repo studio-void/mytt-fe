@@ -19,7 +19,7 @@ export function LoginPage() {
   return (
     <Layout>
       <div className="flex items-center justify-center min-h-screen">
-        <div className="rounded-lg p-8 max-w-lg w-full">
+        <div className="rounded-lg p-8 max-w-xl w-full">
           <div className="text-center mb-8">
             <h1 className="text-4xl font-extrabold mb-2">MyTT</h1>
             <p className="text-gray-600 text-lg">

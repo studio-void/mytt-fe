@@ -2,8 +2,12 @@ export const Footer: React.FC = () => {
   return (
     <footer className="bg-neutral-100 dark:bg-neutral-925">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-12 text-center">
-        <p className="mb-4 text-neutral-800 dark:text-neutral-200 text-md sm:text-lg font-semibold">
-          MyTT
+        <p className="mb-4 text-neutral-800 dark:text-neutral-200 text-md sm:text-lg font-semibold flex justify-center items-center">
+          <img
+            src="/MyTT.svg"
+            alt="MyTT"
+            className="h-7 w-auto translate-y-0.5"
+          />
         </p>
         <p className="mb-4 text-neutral-800 dark:text-neutral-200 text-sm sm:text-base">
           Made with ❤️ by Team{' '}
