@@ -18,7 +18,10 @@ const GOOGLE_ACCESS_TOKEN_KEY = 'google-access-token';
 const GOOGLE_ACCESS_TOKEN_EXPIRY_KEY = 'google-access-token-expiry';
 const DEFAULT_TOKEN_LIFETIME_MS = 55 * 60 * 1000;
 
-const calendarScopes = ['https://www.googleapis.com/auth/calendar.readonly'];
+const calendarScopes = [
+  'https://www.googleapis.com/auth/calendar.readonly',
+  'https://www.googleapis.com/auth/calendar.app.created',
+];
 
 const buildProvider = () => {
   const provider = new GoogleAuthProvider();

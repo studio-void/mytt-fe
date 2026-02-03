@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Plus, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { motion } from 'framer-motion';
 
 import { Layout } from '@/components';
 import { Button } from '@/components/ui/button';
@@ -193,7 +194,17 @@ export function CreateMeetingPage() {
                 onClick={handleManualSync}
                 disabled={manualSyncing}
               >
-                <RefreshCw />
+                <motion.span
+                  animate={manualSyncing ? { rotate: 360 } : { rotate: 0 }}
+                  transition={
+                    manualSyncing
+                      ? { duration: 1, repeat: Infinity, ease: 'linear' }
+                      : { duration: 0.2 }
+                  }
+                  className="inline-flex"
+                >
+                  <RefreshCw />
+                </motion.span>
                 {manualSyncing ? '동기화 중...' : '수동 동기화'}
               </Button>
               <Button

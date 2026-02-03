@@ -50,6 +50,9 @@ interface GoogleCalendarEventItem {
   status?: string;
 }
 
+const MANUAL_CALENDAR_TITLE = 'MyTT';
+const MANUAL_CALENDAR_DESCRIPTION = 'MyTT에서 생성한 에브리타임 시간표';
+
 export interface StoredCalendar {
   id: string;
   title: string;
@@ -109,6 +112,31 @@ const fetchGoogle = async <T>(
   return (await response.json()) as T;
 };
 
+const fetchGoogleRequest = async <T>(
+  path: string,
+  token: string,
+  init: RequestInit,
+) => {
+  const response = await fetch(`${GOOGLE_CALENDAR_BASE}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      ...(init.headers ?? {}),
+    },
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(
+      message || `Google Calendar API error (${response.status})`,
+    );
+  }
+
+  if (response.status === 204) return null as T;
+  return (await response.json()) as T;
+};
+
 const encodeDocId = (value: string) =>
   encodeURIComponent(value).replace(/\./g, '%2E');
 
@@ -131,6 +159,49 @@ const parseDateOnly = (value: string) => {
   return new Date(year, month - 1, day);
 };
 
+const ensureManualCalendarId = async (uid: string, token: string) => {
+  const userRef = doc(db, 'users', uid);
+  const userSnap = await getDoc(userRef);
+  const storedId = userSnap.exists()
+    ? (userSnap.data()?.manualCalendarId as string | undefined)
+    : undefined;
+  if (storedId) {
+    try {
+      await fetchGoogle(
+        `/users/me/calendarList/${encodeDocId(storedId)}`,
+        token,
+      );
+      return storedId;
+    } catch {
+      // ignore and recreate
+    }
+  }
+
+  const created = await fetchGoogleRequest<{ id: string }>(
+    '/calendars',
+    token,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        summary: MANUAL_CALENDAR_TITLE,
+        description: MANUAL_CALENDAR_DESCRIPTION,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      }),
+    },
+  );
+
+  await setDoc(
+    userRef,
+    {
+      manualCalendarId: created.id,
+      manualCalendarCreatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+
+  return created.id;
+};
+
 const mapCalendar = (calendar: GoogleCalendarListItem): StoredCalendar => ({
   id: calendar.id,
   title: calendar.summary,
@@ -141,6 +212,21 @@ const mapCalendar = (calendar: GoogleCalendarListItem): StoredCalendar => ({
   color: calendar.backgroundColor,
   foregroundColor: calendar.foregroundColor,
 });
+
+const upsertManualCalendar = async (uid: string) => {
+  await setDoc(
+    doc(db, 'users', uid, 'calendars', encodeDocId(MANUAL_CALENDAR_ID)),
+    stripUndefined({
+      id: MANUAL_CALENDAR_ID,
+      title: MANUAL_CALENDAR_TITLE,
+      description: '이미지에서 추출한 시간표 일정',
+      isPrimary: false,
+      color: MANUAL_CALENDAR_COLOR,
+      updatedAt: serverTimestamp(),
+    }),
+    { merge: true },
+  );
+};
 
 const mapEvent = (
   event: GoogleCalendarEventItem,
@@ -324,6 +410,93 @@ export const calendarApi = {
         error: error instanceof Error ? error.message : '캘린더 동기화 실패',
       };
     }
+  },
+
+  createTimetableEvents: async (
+    events: Array<{
+      title: string;
+      location?: string;
+      startTime: Date;
+      endTime: Date;
+    }>,
+  ) => {
+    if (!auth.currentUser) {
+      return { error: '로그인이 필요합니다.' };
+    }
+    const token = await authApi.getGoogleAccessToken();
+    const calendarId = await ensureManualCalendarId(
+      auth.currentUser.uid,
+      token,
+    );
+    const batchId = String(Date.now());
+
+    for (const event of events) {
+      await fetchGoogleRequest(
+        `/calendars/${encodeDocId(calendarId)}/events`,
+        token,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            summary: event.title,
+            location: event.location,
+            start: {
+              dateTime: event.startTime.toISOString(),
+              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            },
+            end: {
+              dateTime: event.endTime.toISOString(),
+              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            },
+            extendedProperties: {
+              private: {
+                source: 'timetable-upload',
+                batchId,
+              },
+            },
+          }),
+        },
+      );
+    }
+
+    return { data: true };
+  },
+
+  deleteTimetableEvents: async (start: Date, end: Date) => {
+    if (!auth.currentUser) {
+      return { error: '로그인이 필요합니다.' };
+    }
+    const token = await authApi.getGoogleAccessToken();
+    const calendarId = await ensureManualCalendarId(
+      auth.currentUser.uid,
+      token,
+    );
+    const data = await fetchGoogle<{
+      items?: Array<{
+        id: string;
+        extendedProperties?: { private?: Record<string, string> };
+      }>;
+    }>(`/calendars/${encodeDocId(calendarId)}/events`, token, {
+      timeMin: start.toISOString(),
+      timeMax: end.toISOString(),
+      singleEvents: 'true',
+      maxResults: '2500',
+    });
+
+    const deletions = (data.items ?? [])
+      .filter(
+        (event) =>
+          event.extendedProperties?.private?.source === 'timetable-upload',
+      )
+      .map((event) =>
+        fetchGoogleRequest(
+          `/calendars/${encodeDocId(calendarId)}/events/${encodeDocId(event.id)}`,
+          token,
+          { method: 'DELETE' },
+        ),
+      );
+
+    await Promise.all(deletions);
+    return { data: true };
   },
 
   getCalendars: async () => {

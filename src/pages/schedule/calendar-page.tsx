@@ -1,7 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
 
 import { useNavigate } from '@tanstack/react-router';
-import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import { motion } from 'framer-motion';
+import {
+  ChevronDown,
+  ChevronUp,
+  RefreshCw,
+  SaveAll,
+  Trash,
+  UploadCloud,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Layout } from '@/components';
@@ -35,6 +43,14 @@ interface Calendar {
   isPrimary: boolean;
 }
 
+interface ExtractedScheduleEvent {
+  title: string;
+  location?: string;
+  weekday: number | string;
+  startTime: string;
+  endTime: string;
+}
+
 const normalizeEventRange = (event: CalendarEvent) => {
   const eventStart = new Date(event.startTime);
   const eventEnd = new Date(event.endTime);
@@ -58,16 +74,110 @@ const normalizeEventRange = (event: CalendarEvent) => {
   return { start: eventStart, end: endExclusive, isAllDayLike };
 };
 
+const GEMINI_MODEL = 'gemini-3-flash-preview';
+
+const fileToBase64 = (file: File) =>
+  new Promise<{ mimeType: string; base64: string }>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result ?? '');
+      const commaIndex = result.indexOf(',');
+      if (commaIndex === -1) {
+        reject(new Error('이미지 데이터를 읽을 수 없습니다.'));
+        return;
+      }
+      resolve({
+        mimeType: file.type || 'image/png',
+        base64: result.slice(commaIndex + 1),
+      });
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+
+const extractJsonFromText = (text: string) => {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const raw = fenced ? fenced[1] : text;
+  const arrayStart = raw.indexOf('[');
+  const objectStart = raw.indexOf('{');
+  const startIndex =
+    arrayStart !== -1 && (objectStart === -1 || arrayStart < objectStart)
+      ? arrayStart
+      : objectStart;
+  if (startIndex === -1) {
+    throw new Error('응답에서 JSON을 찾을 수 없습니다.');
+  }
+  const arrayEnd = raw.lastIndexOf(']');
+  const objectEnd = raw.lastIndexOf('}');
+  const endIndex = arrayEnd > objectEnd ? arrayEnd : objectEnd;
+  if (endIndex === -1) {
+    throw new Error('응답 JSON이 완전하지 않습니다.');
+  }
+  return JSON.parse(raw.slice(startIndex, endIndex + 1));
+};
+
+const weekdayToNumber = (value: number | string) => {
+  if (typeof value === 'number') return value;
+  const normalized = value.trim().toLowerCase();
+  const map: Record<string, number> = {
+    월: 1,
+    화: 2,
+    수: 3,
+    목: 4,
+    금: 5,
+    토: 6,
+    일: 7,
+    mon: 1,
+    tue: 2,
+    wed: 3,
+    thu: 4,
+    fri: 5,
+    sat: 6,
+    sun: 7,
+  };
+  return map[normalized] ?? Number(normalized);
+};
+
+const parseTime = (value: string) => {
+  const [hourPart, minutePart] = value.split(':');
+  const hour = Number(hourPart);
+  const minute = Number(minutePart ?? '0');
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+  return { hour, minute };
+};
+
+const parseDateInput = (value: string) => {
+  const [year, month, day] = value.split('-').map((part) => Number(part));
+  if (!year || !month || !day) return new Date(value);
+  return new Date(year, month - 1, day);
+};
+
+const normalizeDateRange = (startValue: string, endValue: string) => {
+  const start = parseDateInput(startValue);
+  const end = parseDateInput(endValue);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+};
+
 export function CalendarPage() {
   const navigate = useNavigate();
   const { isAuthenticated, isAuthReady } = useAuthStore();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [calendars, setCalendars] = useState<Calendar[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
   const [isCalendarPickerOpen, setIsCalendarPickerOpen] = useState(false);
   const [selectedCalendars, setSelectedCalendars] = useState<string[]>([]);
+  const [isTimetableModalOpen, setIsTimetableModalOpen] = useState(false);
+  const [timetableFile, setTimetableFile] = useState<File | null>(null);
+  const [timetablePreview, setTimetablePreview] = useState<string | null>(null);
+  const [repeatStartDate, setRepeatStartDate] = useState('');
+  const [repeatEndDate, setRepeatEndDate] = useState('');
+  const [analyzingTimetable, setAnalyzingTimetable] = useState(false);
+  const [deletingTimetable, setDeletingTimetable] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
     null,
   );
@@ -130,6 +240,7 @@ export function CalendarPage() {
 
   const handleSyncCalendar = async () => {
     setLoading(true);
+    setIsSyncing(true);
     try {
       const { start, end } = getRangeForView(currentDate, viewMode);
       const response = await calendarApi.syncCalendar(start, end);
@@ -154,6 +265,7 @@ export function CalendarPage() {
       toast.error('캘린더 동기화에 실패했습니다.');
     } finally {
       setLoading(false);
+      setIsSyncing(false);
     }
   };
 
@@ -171,6 +283,237 @@ export function CalendarPage() {
 
   const closeEventDetail = () => {
     setSelectedEvent(null);
+  };
+
+  const handleTimetableFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      setTimetableFile(null);
+      setTimetablePreview(null);
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      toast.error('이미지 파일만 업로드할 수 있습니다.');
+      return;
+    }
+    setTimetableFile(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setTimetablePreview(String(reader.result ?? ''));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const analyzeTimetableImage = async (file: File) => {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('Gemini API 키가 설정되지 않았습니다.');
+    }
+    const { base64, mimeType } = await fileToBase64(file);
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  text: `너는 시간표 이미지를 읽어서 일정 목록으로 변환하는 도우미야.
+아래 JSON 형식으로만 응답해줘. 설명이나 마크다운은 넣지 마.
+{
+  "events": [
+    {
+      "title": "과목명",
+      "location": "장소(없으면 생략)",
+      "weekday": 1,
+      "startTime": "HH:mm",
+      "endTime": "HH:mm"
+    }
+  ]
+}
+weekday는 ISO 기준 숫자(월=1 ... 일=7)로만 출력해.
+시간은 24시간제 HH:mm으로 출력해.`,
+                },
+                {
+                  inline_data: {
+                    mime_type: mimeType,
+                    data: base64,
+                  },
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.1,
+          },
+        }),
+      },
+    );
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || 'Gemini 응답 실패');
+    }
+    const data = (await response.json()) as {
+      candidates?: Array<{
+        content?: { parts?: Array<{ text?: string }> };
+      }>;
+    };
+    const text =
+      data.candidates?.[0]?.content?.parts?.map((part) => part.text).join('') ??
+      '';
+    const parsed = extractJsonFromText(text) as
+      | { events: ExtractedScheduleEvent[] }
+      | ExtractedScheduleEvent[];
+    const events = Array.isArray(parsed) ? parsed : parsed.events;
+    return (events ?? []).filter(Boolean);
+  };
+
+  const buildRepeatingEvents = (
+    extracted: ExtractedScheduleEvent[],
+    startDate: Date,
+    endDate: Date,
+  ) => {
+    const results: Array<{
+      title: string;
+      location?: string;
+      startTime: Date;
+      endTime: Date;
+    }> = [];
+    const cursor = new Date(
+      startDate.getFullYear(),
+      startDate.getMonth(),
+      startDate.getDate(),
+    );
+    const last = new Date(
+      endDate.getFullYear(),
+      endDate.getMonth(),
+      endDate.getDate(),
+    );
+    while (cursor <= last) {
+      const weekday = cursor.getDay() === 0 ? 7 : cursor.getDay();
+      extracted.forEach((event) => {
+        const eventWeekday = weekdayToNumber(event.weekday);
+        if (eventWeekday !== weekday) return;
+        const start = parseTime(event.startTime);
+        const end = parseTime(event.endTime);
+        if (!start || !end) return;
+        const startDateTime = new Date(cursor);
+        startDateTime.setHours(start.hour, start.minute, 0, 0);
+        const endDateTime = new Date(cursor);
+        endDateTime.setHours(end.hour, end.minute, 0, 0);
+        if (endDateTime <= startDateTime) {
+          endDateTime.setDate(endDateTime.getDate() + 1);
+        }
+        results.push({
+          title: event.title,
+          location: event.location,
+          startTime: startDateTime,
+          endTime: endDateTime,
+        });
+      });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return results;
+  };
+
+  const handleAnalyzeAndSave = async () => {
+    if (!isAuthenticated) {
+      toast.error('로그인이 필요합니다.');
+      return;
+    }
+    if (!timetableFile) {
+      toast.error('시간표 이미지를 업로드해주세요.');
+      return;
+    }
+    if (!repeatStartDate || !repeatEndDate) {
+      toast.error('반복 시작일과 종료일을 입력해주세요.');
+      return;
+    }
+    const { start, end } = normalizeDateRange(repeatStartDate, repeatEndDate);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      toast.error('유효한 날짜를 입력해주세요.');
+      return;
+    }
+    if (end < start) {
+      toast.error('종료일은 시작일 이후여야 합니다.');
+      return;
+    }
+
+    try {
+      setAnalyzingTimetable(true);
+      const extracted = await analyzeTimetableImage(timetableFile);
+      if (extracted.length === 0) {
+        toast.error('일정을 추출하지 못했습니다.');
+        return;
+      }
+      const generated = buildRepeatingEvents(extracted, start, end);
+      if (generated.length === 0) {
+        toast.error('반복 일정이 생성되지 않았습니다.');
+        return;
+      }
+      const response = await calendarApi.createTimetableEvents(generated);
+      if (response.error) {
+        toast.error(response.error);
+        return;
+      }
+      toast.success('시간표 일정이 저장되었습니다.');
+      setTimetableFile(null);
+      setTimetablePreview(null);
+      await calendarApi.syncCalendar(start, end);
+      await loadCalendars();
+      await loadCalendarEvents();
+      setIsTimetableModalOpen(false);
+    } catch (error) {
+      console.error('Error analyzing timetable:', error);
+      toast.error(
+        error instanceof Error ? error.message : '시간표 분석에 실패했습니다.',
+      );
+    } finally {
+      setAnalyzingTimetable(false);
+    }
+  };
+
+  const handleDeleteTimetable = async () => {
+    if (!repeatStartDate || !repeatEndDate) {
+      toast.error('삭제할 기간을 먼저 입력해주세요.');
+      return;
+    }
+    const { start, end } = normalizeDateRange(repeatStartDate, repeatEndDate);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      toast.error('유효한 날짜를 입력해주세요.');
+      return;
+    }
+    if (end < start) {
+      toast.error('종료일은 시작일 이후여야 합니다.');
+      return;
+    }
+    const confirmed = window.confirm(
+      '해당 기간의 업로드된 시간표 일정을 모두 삭제할까요?',
+    );
+    if (!confirmed) return;
+    try {
+      setDeletingTimetable(true);
+      const response = await calendarApi.deleteTimetableEvents(start, end);
+      if (response.error) {
+        toast.error(response.error);
+        return;
+      }
+      toast.success('시간표 일정이 삭제되었습니다.');
+      await calendarApi.syncCalendar(start, end);
+      await loadCalendars();
+      await loadCalendarEvents();
+      setIsTimetableModalOpen(false);
+    } catch (error) {
+      console.error('Error deleting timetable:', error);
+      toast.error(
+        error instanceof Error ? error.message : '시간표 삭제에 실패했습니다.',
+      );
+    } finally {
+      setDeletingTimetable(false);
+    }
   };
 
   const startOfDay = (date: Date) =>
@@ -223,10 +566,30 @@ export function CalendarPage() {
             <h1 className="text-2xl sm:text-3xl font-extrabold mb-2">
               일정 관리
             </h1>
-            <Button onClick={handleSyncCalendar} disabled={loading}>
-              <RefreshCw />
-              {loading ? '동기화 중...' : '캘린더 동기화'}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsTimetableModalOpen(true)}
+              >
+                <UploadCloud />
+                에타 시간표 업로드
+              </Button>
+              <Button onClick={handleSyncCalendar} disabled={loading}>
+                <motion.span
+                  animate={isSyncing ? { rotate: 360 } : { rotate: 0 }}
+                  transition={
+                    isSyncing
+                      ? { duration: 1, repeat: Infinity, ease: 'linear' }
+                      : { duration: 0.2 }
+                  }
+                  className="inline-flex"
+                >
+                  <RefreshCw />
+                </motion.span>
+                {isSyncing ? '동기화 중...' : '캘린더 동기화'}
+              </Button>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -821,6 +1184,99 @@ export function CalendarPage() {
                 <span className="text-right whitespace-pre-wrap">
                   {selectedEvent.description || '없음'}
                 </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {isTimetableModalOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setIsTimetableModalOpen(false)}
+        >
+          <div
+            className="h-full w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+              <h2 className="text-lg font-semibold">
+                에브리타임 시간표 업로드
+              </h2>
+              <button
+                type="button"
+                className="text-sm text-gray-500 hover:text-gray-800"
+                onClick={() => setIsTimetableModalOpen(false)}
+              >
+                닫기
+              </button>
+            </div>
+            <div className="h-full overflow-y-auto px-5 py-4">
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-semibold block mb-2">
+                    시간표 이미지
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleTimetableFileChange}
+                    className="w-full text-sm"
+                  />
+                </div>
+                {timetablePreview && (
+                  <img
+                    src={timetablePreview}
+                    alt="업로드한 시간표 미리보기"
+                    className="w-full rounded-lg border border-gray-200"
+                  />
+                )}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <label className="text-xs text-gray-500">
+                    시작일
+                    <input
+                      type="date"
+                      value={repeatStartDate}
+                      onChange={(event) =>
+                        setRepeatStartDate(event.target.value)
+                      }
+                      className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
+                    />
+                  </label>
+                  <label className="text-xs text-gray-500">
+                    종료일
+                    <input
+                      type="date"
+                      value={repeatEndDate}
+                      onChange={(event) => setRepeatEndDate(event.target.value)}
+                      className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
+                    />
+                  </label>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    onClick={handleAnalyzeAndSave}
+                    disabled={analyzingTimetable || deletingTimetable}
+                  >
+                    <SaveAll />
+                    {analyzingTimetable ? '분석 중...' : '분석 후 저장'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={handleDeleteTimetable}
+                    disabled={analyzingTimetable || deletingTimetable}
+                  >
+                    <Trash />
+                    {deletingTimetable ? '삭제 중...' : '시간표 삭제'}
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-500 mb-16">
+                  삭제는 입력한 기간 내의 에브리타임 시간표만 제거합니다. 시간표
+                  추가 또는 삭제 후에는 꼭 동기화를 다시 진행해 주세요!
+                </p>
               </div>
             </div>
           </div>
