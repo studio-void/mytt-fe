@@ -876,30 +876,44 @@ export function MeetingJoinPage() {
                           className="relative border-l border-gray-100"
                         >
                           {recommendations.map((rec) => {
-                            if (!isSameDay(rec.start, day)) return null;
+                            const dayStart = startOfDay(day);
+                            const dayEnd = new Date(dayStart);
+                            dayEnd.setDate(dayEnd.getDate() + 1);
+                            if (rec.end <= dayStart || rec.start >= dayEnd) {
+                              return null;
+                            }
+                            const segmentStart =
+                              rec.start > dayStart ? rec.start : dayStart;
+                            const segmentEnd = rec.end < dayEnd ? rec.end : dayEnd;
                             const durationMinutes =
-                              (rec.end.getTime() - rec.start.getTime()) / 60000;
+                              (segmentEnd.getTime() -
+                                segmentStart.getTime()) /
+                              60000;
                             const offsetMinutes =
-                              rec.start.getHours() * 60 +
-                              rec.start.getMinutes();
+                              (segmentStart.getTime() - dayStart.getTime()) /
+                              60000;
                             const height =
                               (durationMinutes / AVAIL_SLOT_MINUTES) *
                               AVAIL_SLOT_HEIGHT;
                             const top =
                               (offsetMinutes / AVAIL_SLOT_MINUTES) *
                               AVAIL_SLOT_HEIGHT;
+                            const showLabel =
+                              segmentStart.getTime() === rec.start.getTime();
 
                             return (
                               <div
                                 key={rec.start.toISOString()}
-                                className="absolute left-0 right-0 z-10 pointer-events-none"
+                                className="absolute left-0 right-0 z-20 pointer-events-none"
                                 style={{ top, height }}
                               >
-                                <div className="relative h-full w-full rounded-md border-2 border-blue-500/70 bg-blue-50/20 shadow-[0_0_0_1px_rgba(59,130,246,0.15)_inset]">
-                                  <div className="absolute right-1 top-1 flex items-center gap-1 rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 shadow">
-                                    <Sparkles className="h-3 w-3" />
-                                    추천 시간
-                                  </div>
+                                <div className="relative h-full w-full rounded-md border-2 border-blue-600 bg-blue-200/35 shadow-[0_0_0_1px_rgba(37,99,235,0.25)_inset]">
+                                  {showLabel && (
+                                    <div className="absolute right-1 top-1 flex items-center gap-1 rounded bg-white/95 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 shadow">
+                                      <Sparkles className="h-3 w-3" />
+                                      추천 시간
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             );
@@ -1443,15 +1457,21 @@ const getAvailabilityColor = (availability: number) => {
 
 const isWithinActiveHours = (start: Date, end: Date) => {
   const startMinutes = start.getHours() * 60 + start.getMinutes();
+  const startDay = startOfDay(start);
+  const endDay = startOfDay(end);
+  const dayDiff = Math.round(
+    (endDay.getTime() - startDay.getTime()) / 86_400_000,
+  );
   const endMinutesRaw = end.getHours() * 60 + end.getMinutes();
-  const isNextDay =
-    start.getFullYear() !== end.getFullYear() ||
-    start.getMonth() !== end.getMonth() ||
-    start.getDate() !== end.getDate();
-  const endMinutes = isNextDay && endMinutesRaw === 0 ? 24 * 60 : endMinutesRaw;
   const ACTIVE_START = 9 * 60;
-  const ACTIVE_END = 24 * 60;
-  return startMinutes >= ACTIVE_START && endMinutes <= ACTIVE_END;
+  const ACTIVE_END_NEXT = 2 * 60;
+  if (dayDiff === 0) {
+    return startMinutes >= ACTIVE_START;
+  }
+  if (dayDiff === 1) {
+    return startMinutes >= ACTIVE_START && endMinutesRaw <= ACTIVE_END_NEXT;
+  }
+  return false;
 };
 
 const getAvailableCountForRange = (
