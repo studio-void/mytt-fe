@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { Layout } from '@/components';
 import { sharingApi } from '@/services/api/sharingApi';
 import { useAuthStore } from '@/store/useAuthStore';
+import { setPageMeta } from '@/utils/meta';
 
 interface ScheduleEvent {
   id: string;
@@ -80,6 +81,16 @@ export function ViewSchedulePage() {
     }
     loadSchedule();
   }, [uid, id, user?.email, isAuthReady]);
+
+  useEffect(() => {
+    if (!schedule) return;
+    const name = schedule.userNickname ?? schedule.userEmail ?? '사용자';
+    setPageMeta({
+      title: `${name}님의 일정`,
+      description: `지금 바로 MyTT에서 ${name}님의 일정을 확인해 보세요!`,
+    });
+  }, [schedule]);
+
 
   useEffect(() => {
     const timer = setInterval(() => {

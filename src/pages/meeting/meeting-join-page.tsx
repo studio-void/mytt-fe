@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { type StoredEvent, calendarApi } from '@/services/api/calendarApi';
 import { meetingApi } from '@/services/api/meetingApi';
 import { useAuthStore } from '@/store/useAuthStore';
+import { setPageMeta } from '@/utils/meta';
 
 interface TimeSlot {
   startTime: string;
@@ -93,6 +94,15 @@ export function MeetingJoinPage() {
 
     loadMeetingData();
   }, [inviteCode, isAuthenticated]);
+
+  useEffect(() => {
+    if (!meeting) return;
+    setPageMeta({
+      title: meeting.title || '약속',
+      description: meeting.description || 'MyTT에서 약속에 참여하세요!',
+    });
+  }, [meeting]);
+
 
   useEffect(() => {
     const stopDragging = () => setIsDragging(false);

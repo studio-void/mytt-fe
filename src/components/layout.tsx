@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 
 import { Footer } from './footer';
 import { Header } from './header';
+import { setPageMeta } from '@/utils/meta';
 
 export const Layout: React.FC<
   PropsWithChildren<{ disableHeaderHeight?: boolean }>
@@ -25,6 +26,13 @@ export const Layout: React.FC<
     observer.observe(headerEl);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    setPageMeta({
+      title: 'MyTT',
+      description: '약속 잡기와 일정 공유를 한 곳에서',
+    });
+  }, [location.pathname, location.searchStr]);
 
   return (
     <div className="min-h-screen w-full">
