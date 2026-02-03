@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { useNavigate } from '@tanstack/react-router';
+import { Save } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Layout } from '@/components';
@@ -143,6 +144,7 @@ export function SettingsPage() {
 
           <div className="flex justify-end">
             <Button onClick={handleSave} disabled={saving}>
+              <Save />
               {saving ? '저장 중...' : '저장하기'}
             </Button>
           </div>
