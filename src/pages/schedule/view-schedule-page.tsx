@@ -28,6 +28,29 @@ interface ScheduleData {
   events?: ScheduleEvent[];
 }
 
+const normalizeEventRange = (event: ScheduleEvent) => {
+  const eventStart = new Date(event.startTime);
+  const eventEnd = new Date(event.endTime);
+  const startsAtMidnight =
+    eventStart.getHours() === 0 &&
+    eventStart.getMinutes() === 0 &&
+    eventStart.getSeconds() === 0 &&
+    eventStart.getMilliseconds() === 0;
+  const endsAtMidnight =
+    eventEnd.getHours() === 0 &&
+    eventEnd.getMinutes() === 0 &&
+    eventEnd.getSeconds() === 0 &&
+    eventEnd.getMilliseconds() === 0;
+  const durationMs = eventEnd.getTime() - eventStart.getTime();
+  const isAllDayLike =
+    event.isAllDay ||
+    (startsAtMidnight && endsAtMidnight && durationMs >= 86_400_000);
+  const endExclusive = isAllDayLike
+    ? new Date(eventEnd.getTime() - 1)
+    : eventEnd;
+  return { start: eventStart, end: endExclusive, isAllDayLike };
+};
+
 export function ViewSchedulePage() {
   const { uid, id } = useParams({ strict: false }) as {
     uid?: string;
@@ -94,9 +117,8 @@ export function ViewSchedulePage() {
     const dayStart = startOfDay(date);
     const dayEnd = endOfDay(date);
     return events.filter((event) => {
-      const eventStart = new Date(event.startTime);
-      const eventEnd = new Date(event.endTime);
-      return eventStart <= dayEnd && eventEnd >= dayStart;
+      const { start, end } = normalizeEventRange(event);
+      return start <= dayEnd && end >= dayStart;
     });
   };
 
@@ -727,12 +749,10 @@ const splitEventsForDate = (events: ScheduleEvent[], date: Date) => {
   const timedEvents: ScheduleEvent[] = [];
 
   events.forEach((event) => {
-    const eventStart = new Date(event.startTime);
-    const eventEnd = new Date(event.endTime);
+    const { start: eventStart, end: eventEnd, isAllDayLike } =
+      normalizeEventRange(event);
     const spansFullDay =
-      event.isAllDay ||
-      (eventStart <= dayStart && eventEnd >= dayEnd) ||
-      (eventStart.getHours() === 0 && eventEnd.getHours() === 0);
+      isAllDayLike || (eventStart <= dayStart && eventEnd >= dayEnd);
 
     if (spansFullDay) {
       allDayEvents.push(event);
@@ -747,8 +767,7 @@ const splitEventsForDate = (events: ScheduleEvent[], date: Date) => {
 const getEventPosition = (event: ScheduleEvent, date: Date) => {
   const dayStart = startOfDay(date);
   const dayEnd = endOfDay(date);
-  const eventStart = new Date(event.startTime);
-  const eventEnd = new Date(event.endTime);
+  const { start: eventStart, end: eventEnd } = normalizeEventRange(event);
   const clampedStart = eventStart < dayStart ? dayStart : eventStart;
   const clampedEnd = eventEnd > dayEnd ? dayEnd : eventEnd;
   const startMinutes = clampedStart.getHours() * 60 + clampedStart.getMinutes();
@@ -765,8 +784,7 @@ const getEventPosition = (event: ScheduleEvent, date: Date) => {
 const getEventMinutes = (event: ScheduleEvent, date: Date) => {
   const dayStart = startOfDay(date);
   const dayEnd = endOfDay(date);
-  const eventStart = new Date(event.startTime);
-  const eventEnd = new Date(event.endTime);
+  const { start: eventStart, end: eventEnd } = normalizeEventRange(event);
   const clampedStart = eventStart < dayStart ? dayStart : eventStart;
   const clampedEnd = eventEnd > dayEnd ? dayEnd : eventEnd;
   const startMinutes = clampedStart.getHours() * 60 + clampedStart.getMinutes();
