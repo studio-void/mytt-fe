@@ -12,9 +12,15 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
   useEffect(() => {
     authApi
       .completeRedirectSignIn()
-      .then((user) => {
-        if (user) {
+      .then((result) => {
+        if (result?.hasRedirectResult) {
           toast.success('Google 로그인 완료');
+          return;
+        }
+        if (!result?.user) {
+          toast.info(
+            `리디렉트 결과 없음 (persistence: ${result?.persistence ?? 'unknown'})`,
+          );
         }
       })
       .catch((error) => {

@@ -3,6 +3,7 @@ import {
   type User,
   type UserCredential,
   browserLocalPersistence,
+  browserSessionPersistence,
   getRedirectResult,
   indexedDBLocalPersistence,
   onAuthStateChanged,
@@ -219,14 +220,36 @@ const isStandalonePwa = () => {
 };
 
 const shouldUseRedirect = () => isStandalonePwa();
-const getPersistence = () =>
-  isStandalonePwa() && isIOSDevice()
-    ? indexedDBLocalPersistence
-    : browserLocalPersistence;
+
+const setBestPersistence = async () => {
+  const candidates =
+    isStandalonePwa() && isIOSDevice()
+      ? [
+          browserSessionPersistence,
+          browserLocalPersistence,
+          indexedDBLocalPersistence,
+        ]
+      : [
+          indexedDBLocalPersistence,
+          browserLocalPersistence,
+          browserSessionPersistence,
+        ];
+
+  for (const persistence of candidates) {
+    try {
+      await setPersistence(auth, persistence);
+      return persistence;
+    } catch {
+      // Try next persistence option.
+    }
+  }
+
+  return null;
+};
 
 export const authApi = {
   googleLogin: async () => {
-    await setPersistence(auth, getPersistence());
+    await setBestPersistence();
     const provider = buildProvider();
     if (shouldUseRedirect()) {
       await signInWithRedirect(auth, provider);
@@ -254,9 +277,15 @@ export const authApi = {
     onAuthStateChanged(auth, callback),
 
   completeRedirectSignIn: async () => {
-    await setPersistence(auth, getPersistence());
+    const persistence = await setBestPersistence();
     const result = await getRedirectResult(auth);
-    if (!result) return null;
+    if (!result) {
+      return {
+        user: auth.currentUser,
+        hasRedirectResult: false,
+        persistence: persistence?.type ?? null,
+      };
+    }
     const tokenData = extractAccessToken(
       result as UserCredential & { _tokenResponse?: { expiresIn?: string } },
     );
@@ -266,7 +295,11 @@ export const authApi = {
     if (result.user) {
       await upsertUserProfile(result.user);
     }
-    return result.user;
+    return {
+      user: result.user ?? auth.currentUser,
+      hasRedirectResult: true,
+      persistence: persistence?.type ?? null,
+    };
   },
 
   getGoogleAccessToken: async () => {
@@ -281,7 +314,7 @@ export const authApi = {
 
     const provider = buildProvider();
     if (shouldUseRedirect()) {
-      await setPersistence(auth, getPersistence());
+      await setBestPersistence();
       await reauthenticateWithRedirect(auth.currentUser, provider);
       throw new Error('리디렉트 인증이 필요합니다.');
     }
