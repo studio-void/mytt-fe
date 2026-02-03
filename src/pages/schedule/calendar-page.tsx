@@ -14,6 +14,8 @@ interface CalendarEvent {
   id: string;
   calendarId: string;
   title: string;
+  description?: string;
+  location?: string;
   startTime: Date;
   endTime: Date;
   isAllDay: boolean;
@@ -43,6 +45,9 @@ export function CalendarPage() {
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
   const [isCalendarPickerOpen, setIsCalendarPickerOpen] = useState(false);
   const [selectedCalendars, setSelectedCalendars] = useState<string[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
+    null,
+  );
 
   useEffect(() => {
     if (isAuthReady && !isAuthenticated) {
@@ -135,6 +140,14 @@ export function CalendarPage() {
         ? prev.filter((id) => id !== calendarId)
         : [...prev, calendarId],
     );
+  };
+
+  const openEventDetail = (event: CalendarEvent) => {
+    setSelectedEvent(event);
+  };
+
+  const closeEventDetail = () => {
+    setSelectedEvent(null);
   };
 
   const startOfDay = (date: Date) =>
@@ -412,9 +425,11 @@ export function CalendarPage() {
                           ) : (
                             <div className="flex flex-wrap gap-1">
                               {allDayEvents.map((event) => (
-                                <span
+                                <button
                                   key={event.id}
-                                  className="text-[11px] px-2 py-1 rounded-full text-white"
+                                  type="button"
+                                  onClick={() => openEventDetail(event)}
+                                  className="text-[11px] px-2 py-1 rounded-full text-white shadow-sm hover:opacity-90"
                                   style={{
                                     backgroundColor:
                                       event.calendarColor || '#999999',
@@ -422,7 +437,7 @@ export function CalendarPage() {
                                   title={event.title}
                                 >
                                   {event.title}
-                                </span>
+                                </button>
                               ))}
                             </div>
                           )}
@@ -469,7 +484,15 @@ export function CalendarPage() {
                             return (
                               <div
                                 key={event.id}
-                                className="absolute left-1 right-1 rounded-lg px-2 py-1 text-[11px] text-white shadow-sm"
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => openEventDetail(event)}
+                                onKeyDown={(eventKey) => {
+                                  if (eventKey.key === 'Enter') {
+                                    openEventDetail(event);
+                                  }
+                                }}
+                                className="absolute left-1 right-1 cursor-pointer rounded-lg px-2 py-1 text-[11px] text-white shadow-sm hover:opacity-90"
                                 style={{
                                   top,
                                   height,
@@ -508,16 +531,18 @@ export function CalendarPage() {
                       ) : (
                         <div className="flex flex-wrap gap-2">
                           {dayEvents.allDayEvents.map((event) => (
-                            <span
+                            <button
                               key={event.id}
-                              className="text-xs px-2 py-1 rounded-full text-white"
+                              type="button"
+                              onClick={() => openEventDetail(event)}
+                              className="text-xs px-2 py-1 rounded-full text-white shadow-sm hover:opacity-90"
                               style={{
                                 backgroundColor:
                                   event.calendarColor || '#999999',
                               }}
                             >
                               {event.title}
-                            </span>
+                            </button>
                           ))}
                         </div>
                       )}
@@ -560,7 +585,15 @@ export function CalendarPage() {
                         return (
                           <div
                             key={event.id}
-                            className="absolute left-2 right-2 rounded-lg px-3 py-2 text-xs text-white shadow-sm"
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => openEventDetail(event)}
+                            onKeyDown={(eventKey) => {
+                              if (eventKey.key === 'Enter') {
+                                openEventDetail(event);
+                              }
+                            }}
+                            className="absolute left-2 right-2 cursor-pointer rounded-lg px-3 py-2 text-xs text-white shadow-sm hover:opacity-90"
                             style={{
                               top,
                               height,
@@ -686,12 +719,6 @@ export function CalendarPage() {
                         }
                       />
                       <div className="flex items-center gap-2">
-                        {/* {calendar.color && (
-                          <span
-                            className="inline-block h-2.5 w-2.5 rounded-full"
-                            style={{ backgroundColor: calendar.color }}
-                          />
-                        )} */}
                         <span className="text-gray-700">
                           {calendar.title}
                           {calendar.isPrimary && (
@@ -709,6 +736,72 @@ export function CalendarPage() {
           </div>
         </div>
       </div>
+      {selectedEvent && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={closeEventDetail}
+        >
+          <div
+            className="w-full max-w-md rounded-xl bg-white shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div
+              className="rounded-t-xl px-5 py-4 text-white"
+              style={{
+                backgroundColor: selectedEvent.calendarColor || '#999999',
+              }}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <h3 className="text-lg font-semibold">{selectedEvent.title}</h3>
+                <button
+                  type="button"
+                  className="text-sm text-white/80 hover:text-white"
+                  onClick={closeEventDetail}
+                >
+                  닫기
+                </button>
+              </div>
+              {selectedEvent.calendarTitle && (
+                <p className="mt-1 text-xs text-white/80">
+                  {selectedEvent.calendarTitle}
+                </p>
+              )}
+            </div>
+            <div className="px-5 py-4 text-sm text-gray-700">
+              <div className="flex items-center justify-between py-2">
+                <span className="text-gray-500">시간</span>
+                <span>
+                  {selectedEvent.isAllDay
+                    ? '하루 종일'
+                    : `${new Date(selectedEvent.startTime).toLocaleString(
+                        'ko-KR',
+                      )} ~ ${new Date(selectedEvent.endTime).toLocaleString(
+                        'ko-KR',
+                      )}`}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-gray-500">일정 종류</span>
+                <span>{selectedEvent.isBusy ? '바쁨' : '여유'}</span>
+              </div>
+              <div className="flex items-start justify-between gap-4 py-2">
+                <span className="text-gray-500">장소</span>
+                <span className="text-right">
+                  {selectedEvent.location || '없음'}
+                </span>
+              </div>
+              <div className="flex items-start justify-between gap-4 py-2">
+                <span className="text-gray-500">설명</span>
+                <span className="text-right whitespace-pre-wrap">
+                  {selectedEvent.description || '없음'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }
