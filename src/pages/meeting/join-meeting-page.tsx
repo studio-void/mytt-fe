@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import { Check } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -12,9 +12,18 @@ import { useAuthStore } from '@/store/useAuthStore';
 
 export function JoinMeetingPage() {
   const navigate = useNavigate();
+  const { code } = useSearch({ strict: false }) as { code?: string };
   const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(false);
   const { isAuthenticated, isAuthReady } = useAuthStore();
+
+  useEffect(() => {
+    if (!code) return;
+    const normalized = code.trim().toUpperCase();
+    if (normalized) {
+      setInviteCode(normalized);
+    }
+  }, [code]);
 
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();

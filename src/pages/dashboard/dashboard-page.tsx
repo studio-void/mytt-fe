@@ -55,7 +55,7 @@ export const DashboardPage: React.FC = () => {
                 <IconCalendarEvent size={40} stroke={1.7} />
               </div>
               <h3 className="text-lg sm:text-xl font-semibold mb-3 group-hover:text-gray-900">
-                약속 잡기
+                내 약속
               </h3>
               <p className="text-gray-600 text-sm leading-relaxed">
                 링크를 공유하여 여러 사람과 함께 공통으로 가능한 시간을
@@ -93,7 +93,7 @@ export const DashboardPage: React.FC = () => {
               </p>
             </button>
 
-            <button
+            {/* <button
               onClick={() => navigate({ to: '/meeting/join' })}
               className="p-5 sm:p-8 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors text-left group"
             >
@@ -106,7 +106,7 @@ export const DashboardPage: React.FC = () => {
               <p className="text-gray-600 text-sm leading-relaxed">
                 초대 코드로 다른 사람의 약속에 참여하세요
               </p>
-            </button>
+            </button> */}
           </div>
         </div>
       </div>

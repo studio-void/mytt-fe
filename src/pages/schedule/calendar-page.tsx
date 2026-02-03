@@ -564,7 +564,7 @@ weekday는 ISO 기준 숫자(월=1 ... 일=7)로만 출력해.
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <h1 className="text-2xl sm:text-3xl font-extrabold mb-2">
-              일정 관리
+              내 캘린더
             </h1>
             <div className="flex flex-wrap items-center gap-2">
               <Button
