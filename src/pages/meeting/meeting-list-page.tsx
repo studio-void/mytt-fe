@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { useNavigate } from '@tanstack/react-router';
+import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Layout } from '@/components';
@@ -75,7 +76,7 @@ export function MeetingListPage() {
             <p className="text-gray-600">내가 만든 약속을 확인하세요.</p>
           </div>
           <Button onClick={() => navigate({ to: '/meeting/create' })}>
-            새 약속 만들기
+            <Plus /> 새 약속 만들기
           </Button>
         </div>
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { useNavigate } from '@tanstack/react-router';
+import { RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Layout } from '@/components';
@@ -185,6 +186,7 @@ export function CalendarPage() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <h1 className="text-2xl sm:text-3xl font-extrabold">일정 관리</h1>
             <Button onClick={handleSyncCalendar} disabled={loading}>
+              <RefreshCw />
               {loading ? '동기화 중...' : '캘린더 동기화'}
             </Button>
           </div>

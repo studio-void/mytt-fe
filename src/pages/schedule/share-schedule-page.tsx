@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { IconCalendar, IconLink } from '@tabler/icons-react';
 import { useNavigate } from '@tanstack/react-router';
+import { Pencil, Plus, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Layout } from '@/components';
@@ -209,6 +210,7 @@ export function ShareSchedulePage() {
             Google Calendar와 동기화하여 최신 일정을 불러옵니다
           </p>
           <Button onClick={handleSyncCalendar} disabled={syncing}>
+            <RefreshCw />
             {syncing ? '동기화 중...' : '지금 동기화'}
           </Button>
         </div>
@@ -342,6 +344,7 @@ export function ShareSchedulePage() {
 
             <div className="flex gap-3">
               <Button onClick={handleSaveLink} disabled={loading}>
+                {editingLinkId ? <Pencil /> : <Plus />}
                 {editingLinkId ? '수정 저장' : '링크 생성'}
               </Button>
               {editingLinkId && (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { useNavigate } from '@tanstack/react-router';
+import { Plus, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Layout } from '@/components';
@@ -183,6 +184,7 @@ export function CreateMeetingPage() {
 
             <div className="flex gap-4">
               <Button type="submit" disabled={loading}>
+                <Plus />
                 {loading ? '생성 중...' : '약속 만들기'}
               </Button>
               <Button
@@ -191,6 +193,7 @@ export function CreateMeetingPage() {
                 onClick={handleManualSync}
                 disabled={manualSyncing}
               >
+                <RefreshCw />
                 {manualSyncing ? '동기화 중...' : '수동 동기화'}
               </Button>
               <Button

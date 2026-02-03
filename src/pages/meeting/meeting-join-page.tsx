@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { useNavigate, useParams } from '@tanstack/react-router';
+import { RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Layout } from '@/components';
@@ -394,6 +395,7 @@ export function MeetingJoinPage() {
                   variant="outline"
                   disabled={manualSyncing}
                 >
+                  <RefreshCw />
                   {manualSyncing ? '동기화 중...' : '수동 동기화'}
                 </Button>
               )}
