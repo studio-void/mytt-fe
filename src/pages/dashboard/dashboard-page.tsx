@@ -4,7 +4,7 @@ import {
   IconCalendar,
   IconCalendarEvent,
   IconLink,
-  IconMail,
+  // IconMail,
 } from '@tabler/icons-react';
 import { useNavigate } from '@tanstack/react-router';
 
