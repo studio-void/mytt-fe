@@ -109,7 +109,7 @@ export function CreateMeetingPage() {
   return (
     <Layout disableHeaderHeight>
       <div className="mx-auto py-16">
-        <div className="rounded-lg p-8">
+        <div className="rounded-lg">
           <h1 className="text-3xl font-extrabold mb-8">새 약속 만들기</h1>
 
           <form onSubmit={handleCreateMeeting} className="space-y-6">
