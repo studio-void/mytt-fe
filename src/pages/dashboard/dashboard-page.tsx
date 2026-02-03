@@ -36,7 +36,7 @@ export const DashboardPage: React.FC = () => {
   return (
     <Layout disableHeaderHeight>
       <div className="min-h-screen flex items-center justify-center px-4 py-16 sm:py-16">
-        <div className="w-full max-w-5xl">
+        <div className="w-full">
           <div className="text-center mb-10 sm:mb-16">
             <h1 className="text-3xl sm:text-4xl font-extrabold mb-2">
               대시보드
