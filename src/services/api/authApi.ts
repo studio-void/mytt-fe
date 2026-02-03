@@ -240,6 +240,7 @@ export const authApi = {
     onAuthStateChanged(auth, callback),
 
   completeRedirectSignIn: async () => {
+    await setPersistence(auth, browserLocalPersistence);
     const result = await getRedirectResult(auth);
     if (!result) return null;
     const tokenData = extractAccessToken(
