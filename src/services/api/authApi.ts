@@ -225,9 +225,9 @@ const setBestPersistence = async () => {
   const candidates =
     isStandalonePwa() && isIOSDevice()
       ? [
-          browserSessionPersistence,
           browserLocalPersistence,
           indexedDBLocalPersistence,
+          browserSessionPersistence,
         ]
       : [
           indexedDBLocalPersistence,
@@ -280,8 +280,16 @@ export const authApi = {
     const persistence = await setBestPersistence();
     const result = await getRedirectResult(auth);
     if (!result) {
+      const user = await new Promise<User | null>((resolve) => {
+        const timeout = window.setTimeout(() => resolve(auth.currentUser), 1500);
+        const unsubscribe = onAuthStateChanged(auth, (authUser) => {
+          window.clearTimeout(timeout);
+          unsubscribe();
+          resolve(authUser);
+        });
+      });
       return {
-        user: auth.currentUser,
+        user,
         hasRedirectResult: false,
         persistence: persistence?.type ?? null,
       };
