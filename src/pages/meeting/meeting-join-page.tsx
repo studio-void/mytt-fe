@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { useNavigate, useParams } from '@tanstack/react-router';
-import { Copy, RefreshCw, Trash } from 'lucide-react';
+import { Copy, RefreshCw, Save, Trash } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Layout } from '@/components';
 import { Button } from '@/components/ui/button';
-import { calendarApi, type StoredEvent } from '@/services/api/calendarApi';
+import { type StoredEvent, calendarApi } from '@/services/api/calendarApi';
 import { meetingApi } from '@/services/api/meetingApi';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -425,12 +425,14 @@ export function MeetingJoinPage() {
 
   return (
     <Layout disableHeaderHeight>
-      <div className="mx-auto py-16">
+      <div className="mx-auto py-10 sm:py-16">
         {/* 미팅 정보 */}
-        <div className="border border-gray-200 rounded-lg p-8 mb-6">
-          <div className="flex justify-between items-start mb-4">
+        <div className="border border-gray-200 rounded-lg p-5 sm:p-8 mb-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-4">
             <div>
-              <h1 className="text-3xl font-extrabold mb-2">{meeting.title}</h1>
+              <h1 className="text-2xl sm:text-3xl font-extrabold mb-2">
+                {meeting.title}
+              </h1>
               {meeting.description && (
                 <p className="text-gray-600 mb-4">{meeting.description}</p>
               )}
@@ -442,7 +444,7 @@ export function MeetingJoinPage() {
                 <p>시간대: {meeting.timezone}</p>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button onClick={copyInviteLink} variant="outline">
                 <Copy />
                 링크 복사
@@ -498,15 +500,17 @@ export function MeetingJoinPage() {
 
         {/* 가용성 시각화 */}
         {isAuthenticated && availabilitySlots.length > 0 && (
-          <div className="border border-gray-200 rounded-lg p-8">
-            <h2 className="text-2xl font-extrabold mb-6">최적의 시간 찾기</h2>
+          <div className="border border-gray-200 rounded-lg p-5 sm:p-8">
+            <h2 className="text-xl sm:text-2xl font-extrabold mb-6">
+              최적의 시간 찾기
+            </h2>
             {meetingRange && weekStart && (
               <div className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="text-sm text-gray-600">
                     파란색이 진할수록 더 많은 참가자가 가능한 시간입니다.
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                     <Button
                       variant="outline"
                       type="button"
@@ -540,88 +544,95 @@ export function MeetingJoinPage() {
                   </div>
                 </div>
 
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  <div className="grid grid-cols-[64px_repeat(7,1fr)] bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-600">
-                    <div className="p-2">시간</div>
-                    {availabilityWeekDays.map((day) => (
-                      <div key={day.toISOString()} className="p-2 text-center">
-                        {day.toLocaleDateString('ko-KR', {
-                          month: 'short',
-                          day: 'numeric',
-                          weekday: 'short',
-                        })}
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="grid grid-cols-[64px_repeat(7,1fr)]">
-                    <div>
-                      {AVAIL_HOUR_LABELS.map((label, index) => (
+                <div className="overflow-x-auto">
+                  <div className="min-w-[720px] border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="grid grid-cols-[64px_repeat(7,1fr)] bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-600">
+                      <div className="p-2">시간</div>
+                      {availabilityWeekDays.map((day) => (
                         <div
-                          key={`avail-label-${index}`}
-                          className="text-xs text-gray-400 px-2"
-                          style={{ height: AVAIL_SLOT_HEIGHT * 2 }}
+                          key={day.toISOString()}
+                          className="p-2 text-center"
                         >
-                          {label}
+                          {day.toLocaleDateString('ko-KR', {
+                            month: 'short',
+                            day: 'numeric',
+                            weekday: 'short',
+                          })}
                         </div>
                       ))}
                     </div>
-                    {availabilityWeekDays.map((day) => (
-                      <div
-                        key={day.toISOString()}
-                        className="border-l border-gray-100"
-                      >
-                        {AVAIL_TIME_SLOTS.map((slotMinutes) => {
-                          const slotStart = addMinutes(day, slotMinutes);
-                          const slotEnd = addMinutes(
-                            slotStart,
-                            AVAIL_SLOT_MINUTES,
-                          );
-                          const inRange =
-                            slotStart >= meetingRange.start &&
-                            slotEnd <= meetingRange.end;
-                          const slotKey = slotStart.getTime();
-                          const slot = availabilitySlotMap.get(slotKey);
-                          const availability = slot?.availability ?? 0;
-                          const availabilityPercent = Math.round(
-                            availability * 100,
-                          );
-                          const bgColor = inRange
-                            ? getAvailabilityColor(availability)
-                            : '#f8fafc';
-                          const isOptimal = slot?.isOptimal;
 
-                          return (
-                            <div
-                              key={`${day.toISOString()}-${slotMinutes}`}
-                              className="border-t border-gray-100 relative"
-                              style={{
-                                height: AVAIL_SLOT_HEIGHT,
-                                backgroundColor: bgColor,
-                              }}
-                              title={
-                                inRange && slot
-                                  ? `${availabilityPercent}% (${slot.availableCount}/${participants.length})`
-                                  : ''
-                              }
-                              onMouseEnter={(event) => {
-                                if (!inRange || !slot) return;
-                                setHoveredAvailability({
-                                  slot,
-                                  x: event.clientX,
-                                  y: event.clientY,
-                                });
-                              }}
-                              onMouseLeave={() => setHoveredAvailability(null)}
-                            >
-                              {isOptimal && (
-                                <div className="absolute inset-0 border border-blue-500/40" />
-                              )}
-                            </div>
-                          );
-                        })}
+                    <div className="grid grid-cols-[64px_repeat(7,1fr)]">
+                      <div>
+                        {AVAIL_HOUR_LABELS.map((label, index) => (
+                          <div
+                            key={`avail-label-${index}`}
+                            className="text-xs text-gray-400 px-2"
+                            style={{ height: AVAIL_SLOT_HEIGHT * 2 }}
+                          >
+                            {label}
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                      {availabilityWeekDays.map((day) => (
+                        <div
+                          key={day.toISOString()}
+                          className="border-l border-gray-100"
+                        >
+                          {AVAIL_TIME_SLOTS.map((slotMinutes) => {
+                            const slotStart = addMinutes(day, slotMinutes);
+                            const slotEnd = addMinutes(
+                              slotStart,
+                              AVAIL_SLOT_MINUTES,
+                            );
+                            const inRange =
+                              slotStart >= meetingRange.start &&
+                              slotEnd <= meetingRange.end;
+                            const slotKey = slotStart.getTime();
+                            const slot = availabilitySlotMap.get(slotKey);
+                            const availability = slot?.availability ?? 0;
+                            const availabilityPercent = Math.round(
+                              availability * 100,
+                            );
+                            const bgColor = inRange
+                              ? getAvailabilityColor(availability)
+                              : '#f8fafc';
+                            const isOptimal = slot?.isOptimal;
+
+                            return (
+                              <div
+                                key={`${day.toISOString()}-${slotMinutes}`}
+                                className="border-t border-gray-100 relative"
+                                style={{
+                                  height: AVAIL_SLOT_HEIGHT,
+                                  backgroundColor: bgColor,
+                                }}
+                                title={
+                                  inRange && slot
+                                    ? `${availabilityPercent}% (${slot.availableCount}/${participants.length})`
+                                    : ''
+                                }
+                                onMouseEnter={(event) => {
+                                  if (!inRange || !slot) return;
+                                  setHoveredAvailability({
+                                    slot,
+                                    x: event.clientX,
+                                    y: event.clientY,
+                                  });
+                                }}
+                                onMouseLeave={() =>
+                                  setHoveredAvailability(null)
+                                }
+                              >
+                                {isOptimal && (
+                                  <div className="absolute inset-0 border border-blue-500/40" />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
                 {hoveredAvailability && (
@@ -706,7 +717,7 @@ export function MeetingJoinPage() {
         )}
 
         {isAuthenticated && hasJoined && (
-          <div className="border border-gray-200 rounded-lg p-8 mt-6">
+          <div className="border border-gray-200 rounded-lg p-5 sm:p-8 mt-6">
             <h2 className="text-xl font-extrabold mb-4">
               내 일정에서 제외할 시간
             </h2>
@@ -715,7 +726,7 @@ export function MeetingJoinPage() {
             </p>
             {meetingRange && (
               <div className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="text-sm text-gray-600">
                     15분 단위로 드래그하여 차단 시간을 선택하세요.
                   </div>
@@ -723,7 +734,7 @@ export function MeetingJoinPage() {
                     <span className="inline-block h-2.5 w-2.5 rounded-sm bg-blue-50 border border-blue-100 align-middle mr-1" />
                     내 캘린더 일정
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                     <Button
                       variant="outline"
                       type="button"
@@ -761,101 +772,111 @@ export function MeetingJoinPage() {
                   </div>
                 </div>
 
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  <div className="grid grid-cols-[64px_repeat(7,1fr)] bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-600">
-                    <div className="p-2">시간</div>
-                    {weekDays.map((day) => (
-                      <div key={day.toISOString()} className="p-2 text-center">
-                        {day.toLocaleDateString('ko-KR', {
-                          month: 'short',
-                          day: 'numeric',
-                          weekday: 'short',
-                        })}
-                      </div>
-                    ))}
-                  </div>
-
-                  <div
-                    className="grid grid-cols-[64px_repeat(7,1fr)]"
-                    onPointerUp={() => setIsDragging(false)}
-                  >
-                    <div>
-                      {HOUR_LABELS.map((label, index) => (
+                <div className="overflow-x-auto">
+                  <div className="min-w-[720px] border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="grid grid-cols-[64px_repeat(7,1fr)] bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-600">
+                      <div className="p-2">시간</div>
+                      {weekDays.map((day) => (
                         <div
-                          key={`label-${index}`}
-                          className="text-xs text-gray-400 px-2"
-                          style={{ height: SLOT_HEIGHT * 4 }}
+                          key={day.toISOString()}
+                          className="p-2 text-center"
                         >
-                          {label}
+                          {day.toLocaleDateString('ko-KR', {
+                            month: 'short',
+                            day: 'numeric',
+                            weekday: 'short',
+                          })}
                         </div>
                       ))}
                     </div>
-                    {weekDays.map((day) => {
-                      const dayKey = day.toISOString();
-                      return (
-                        <div key={dayKey} className="border-l border-gray-100">
-                          {TIME_SLOTS.map((slotMinutes) => {
-                            const slotStart = addMinutes(day, slotMinutes);
-                            const slotEnd = addMinutes(slotStart, 15);
-                            const inRange =
-                              slotStart >= meetingRange.start &&
-                              slotEnd <= meetingRange.end;
-                            const slotId = slotStart.toISOString();
-                            const isBlocked = blockedSlots.has(slotId);
-                            const isCalendarBusy = myBusySlots.has(slotId);
-                            const slotEvent = busySlotEventMap.get(slotId);
 
-                            return (
-                              <div
-                                key={slotId}
-                                role="button"
-                                tabIndex={-1}
-                                className={`border-t border-gray-100 ${
-                                  inRange
-                                    ? isBlocked
-                                      ? 'bg-red-400'
-                                      : isCalendarBusy
-                                        ? 'bg-blue-50 hover:bg-red-100'
-                                        : 'bg-white hover:bg-red-100'
-                                    : 'bg-gray-50'
-                                }`}
-                                style={{ height: SLOT_HEIGHT }}
-                                title={
-                                  slotEvent
-                                    ? `${slotEvent.title ?? '일정'}\n${
-                                        slotEvent.calendarTitle ?? '캘린더'
-                                      }\n${slotEvent.location ?? '장소 없음'}`
-                                    : ''
-                                }
-                                onPointerDown={(event) => {
-                                  if (!inRange) return;
-                                  event.preventDefault();
-                                  const nextMode = isBlocked ? 'remove' : 'add';
-                                  setDragMode(nextMode);
-                                  setIsDragging(true);
-                                  handleToggleSlot(slotId, nextMode);
-                                }}
-                                onPointerEnter={() => {
-                                  if (!isDragging || !inRange) return;
-                                  handleToggleSlot(slotId, dragMode);
-                                }}
-                                onMouseEnter={(event) => {
-                                  if (isDragging || !slotEvent) return;
-                                  setHoveredCalendarEvent({
-                                    event: slotEvent,
-                                    x: event.clientX,
-                                    y: event.clientY,
-                                  });
-                                }}
-                                onMouseLeave={() =>
-                                  setHoveredCalendarEvent(null)
-                                }
-                              />
-                            );
-                          })}
-                        </div>
-                      );
-                    })}
+                    <div
+                      className="grid grid-cols-[64px_repeat(7,1fr)]"
+                      onPointerUp={() => setIsDragging(false)}
+                    >
+                      <div>
+                        {HOUR_LABELS.map((label, index) => (
+                          <div
+                            key={`label-${index}`}
+                            className="text-xs text-gray-400 px-2"
+                            style={{ height: SLOT_HEIGHT * 4 }}
+                          >
+                            {label}
+                          </div>
+                        ))}
+                      </div>
+                      {weekDays.map((day) => {
+                        const dayKey = day.toISOString();
+                        return (
+                          <div
+                            key={dayKey}
+                            className="border-l border-gray-100"
+                          >
+                            {TIME_SLOTS.map((slotMinutes) => {
+                              const slotStart = addMinutes(day, slotMinutes);
+                              const slotEnd = addMinutes(slotStart, 15);
+                              const inRange =
+                                slotStart >= meetingRange.start &&
+                                slotEnd <= meetingRange.end;
+                              const slotId = slotStart.toISOString();
+                              const isBlocked = blockedSlots.has(slotId);
+                              const isCalendarBusy = myBusySlots.has(slotId);
+                              const slotEvent = busySlotEventMap.get(slotId);
+
+                              return (
+                                <div
+                                  key={slotId}
+                                  role="button"
+                                  tabIndex={-1}
+                                  className={`border-t border-gray-100 ${
+                                    inRange
+                                      ? isBlocked
+                                        ? 'bg-red-400'
+                                        : isCalendarBusy
+                                          ? 'bg-blue-50 hover:bg-red-100'
+                                          : 'bg-white hover:bg-red-100'
+                                      : 'bg-gray-50'
+                                  }`}
+                                  style={{ height: SLOT_HEIGHT }}
+                                  title={
+                                    slotEvent
+                                      ? `${slotEvent.title ?? '일정'}\n${
+                                          slotEvent.calendarTitle ?? '캘린더'
+                                        }\n${slotEvent.location ?? '장소 없음'}`
+                                      : ''
+                                  }
+                                  onPointerDown={(event) => {
+                                    if (!inRange) return;
+                                    event.preventDefault();
+                                    const nextMode = isBlocked
+                                      ? 'remove'
+                                      : 'add';
+                                    setDragMode(nextMode);
+                                    setIsDragging(true);
+                                    handleToggleSlot(slotId, nextMode);
+                                  }}
+                                  onPointerEnter={() => {
+                                    if (!isDragging || !inRange) return;
+                                    handleToggleSlot(slotId, dragMode);
+                                  }}
+                                  onMouseEnter={(event) => {
+                                    if (isDragging || !slotEvent) return;
+                                    setHoveredCalendarEvent({
+                                      event: slotEvent,
+                                      x: event.clientX,
+                                      y: event.clientY,
+                                    });
+                                  }}
+                                  onMouseLeave={() =>
+                                    setHoveredCalendarEvent(null)
+                                  }
+                                />
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
@@ -907,6 +928,7 @@ export function MeetingJoinPage() {
                   )}
                   <div className="pt-4">
                     <Button onClick={handleSaveBlocks} disabled={savingBlocks}>
+                      <Save />
                       {savingBlocks ? '저장 중...' : '차단 시간 저장'}
                     </Button>
                   </div>
@@ -917,7 +939,7 @@ export function MeetingJoinPage() {
         )}
 
         {!isAuthenticated && (
-          <div className="border border-gray-200 rounded-lg p-8 text-center">
+          <div className="border border-gray-200 rounded-lg p-5 sm:p-8 text-center">
             <p className="text-gray-600 mb-4">
               로그인하여 일정을 연동하고 최적의 시간을 확인하세요.
             </p>

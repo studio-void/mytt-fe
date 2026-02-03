@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { IconCalendar, IconLink } from '@tabler/icons-react';
 import { useNavigate } from '@tanstack/react-router';
-import { Edit, Pencil, Plus, RefreshCw } from 'lucide-react';
+import { Check, Copy, Edit, Pencil, Plus, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Layout } from '@/components';
@@ -39,6 +39,7 @@ export function ShareSchedulePage() {
   const [allowedEmails, setAllowedEmails] = useState<string[]>([]);
   const [emailInput, setEmailInput] = useState('');
   const [editingLinkId, setEditingLinkId] = useState<string | null>(null);
+  const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthReady) return;
@@ -170,6 +171,15 @@ export function ShareSchedulePage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCopyLink = (link: ShareLink) => {
+    navigator.clipboard.writeText(link.url);
+    toast.success('공유 링크가 복사되었습니다!');
+    setCopiedLinkId(link.id);
+    window.setTimeout(() => {
+      setCopiedLinkId((current) => (current === link.id ? null : current));
+    }, 1200);
   };
 
   const linkList = useMemo(() => {
@@ -385,22 +395,38 @@ export function ShareSchedulePage() {
                       </div>
                     </div>
 
-                    <div className="flex gap-3">
+                    <div className="relative">
                       <input
                         type="text"
                         readOnly
                         value={link.url}
-                        className="flex-1 px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-sm"
+                        className="w-full px-3 py-2 pr-10 border border-gray-200 rounded-md bg-gray-50 text-sm"
                       />
-                      <Button
+                      <button
                         type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(link.url);
-                          toast.success('공유 링크가 복사되었습니다!');
-                        }}
+                        onClick={() => handleCopyLink(link)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                        aria-label="링크 복사"
                       >
-                        복사
-                      </Button>
+                        <span
+                          className={`absolute inset-0 flex items-center justify-center transition-all duration-200 ${
+                            copiedLinkId === link.id
+                              ? 'scale-100 opacity-100'
+                              : 'scale-75 opacity-0'
+                          }`}
+                        >
+                          <Check size={18} />
+                        </span>
+                        <span
+                          className={`absolute inset-0 flex items-center justify-center transition-all duration-200 ${
+                            copiedLinkId === link.id
+                              ? 'scale-125 opacity-0'
+                              : 'scale-100 opacity-100'
+                          }`}
+                        >
+                          <Copy size={18} />
+                        </span>
+                      </button>
                     </div>
 
                     <div className="flex flex-wrap gap-2">

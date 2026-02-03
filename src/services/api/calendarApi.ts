@@ -125,6 +125,12 @@ const stripUndefined = <T extends Record<string, unknown>>(value: T) =>
     Object.entries(value).filter(([, entry]) => entry !== undefined),
   ) as T;
 
+const parseDateOnly = (value: string) => {
+  const [year, month, day] = value.split('-').map((part) => Number(part));
+  if (!year || !month || !day) return new Date(value);
+  return new Date(year, month - 1, day);
+};
+
 const mapCalendar = (calendar: GoogleCalendarListItem): StoredCalendar => ({
   id: calendar.id,
   title: calendar.summary,
@@ -146,8 +152,8 @@ const mapEvent = (
   if (!startValue || !endValue) return null;
 
   const isAllDay = !!event.start.date && !event.start.dateTime;
-  const startTime = new Date(startValue);
-  const endTime = new Date(endValue);
+  const startTime = isAllDay ? parseDateOnly(startValue) : new Date(startValue);
+  const endTime = isAllDay ? parseDateOnly(endValue) : new Date(endValue);
 
   return {
     id: event.id,

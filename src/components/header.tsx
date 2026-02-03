@@ -1,6 +1,7 @@
 import { forwardRef, useState } from 'react';
 
 import { Link, useNavigate } from '@tanstack/react-router';
+import { LogOut } from 'lucide-react';
 
 import { authApi } from '@/services/api/authApi';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -67,6 +68,7 @@ export const Header = forwardRef<
               <>
                 <span className="text-sm text-gray-600">{user?.email}</span>
                 <Button variant="outline" size="sm" onClick={handleLogout}>
+                  <LogOut />
                   로그아웃
                 </Button>
               </>
@@ -144,6 +146,7 @@ export const Header = forwardRef<
                     {user?.email}
                   </span>
                   <Button variant="outline" size="sm" onClick={handleLogout}>
+                    <LogOut />
                     로그아웃
                   </Button>
                 </div>

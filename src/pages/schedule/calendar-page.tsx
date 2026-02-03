@@ -35,6 +35,29 @@ interface Calendar {
   isPrimary: boolean;
 }
 
+const normalizeEventRange = (event: CalendarEvent) => {
+  const eventStart = new Date(event.startTime);
+  const eventEnd = new Date(event.endTime);
+  const startsAtMidnight =
+    eventStart.getHours() === 0 &&
+    eventStart.getMinutes() === 0 &&
+    eventStart.getSeconds() === 0 &&
+    eventStart.getMilliseconds() === 0;
+  const endsAtMidnight =
+    eventEnd.getHours() === 0 &&
+    eventEnd.getMinutes() === 0 &&
+    eventEnd.getSeconds() === 0 &&
+    eventEnd.getMilliseconds() === 0;
+  const durationMs = eventEnd.getTime() - eventStart.getTime();
+  const isAllDayLike =
+    event.isAllDay ||
+    (startsAtMidnight && endsAtMidnight && durationMs >= 86_400_000);
+  const endExclusive = isAllDayLike
+    ? new Date(eventEnd.getTime() - 1)
+    : eventEnd;
+  return { start: eventStart, end: endExclusive, isAllDayLike };
+};
+
 export function CalendarPage() {
   const navigate = useNavigate();
   const { isAuthenticated, isAuthReady } = useAuthStore();
@@ -171,9 +194,8 @@ export function CalendarPage() {
     const dayStart = startOfDay(date);
     const dayEnd = endOfDay(date);
     return events.filter((event) => {
-      const eventStart = new Date(event.startTime);
-      const eventEnd = new Date(event.endTime);
-      return eventStart <= dayEnd && eventEnd >= dayStart;
+      const { start, end } = normalizeEventRange(event);
+      return start <= dayEnd && end >= dayStart;
     });
   };
 
@@ -198,7 +220,9 @@ export function CalendarPage() {
       <div className="mx-auto py-16">
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <h1 className="text-2xl sm:text-3xl font-extrabold">일정 관리</h1>
+            <h1 className="text-2xl sm:text-3xl font-extrabold mb-2">
+              일정 관리
+            </h1>
             <Button onClick={handleSyncCalendar} disabled={loading}>
               <RefreshCw />
               {loading ? '동기화 중...' : '캘린더 동기화'}
@@ -269,7 +293,7 @@ export function CalendarPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           {/* 캘린더 */}
           <div className="lg:col-span-2 rounded-lg">
             {viewMode === 'month' && (
@@ -623,7 +647,7 @@ export function CalendarPage() {
           </div>
 
           {/* 이벤트 목록 */}
-          <div className="rounded-lg p-4 sm:p-6">
+          <div className="rounded-lg">
             <h3 className="text-base sm:text-lg font-semibold mb-4">
               {viewMode === 'day'
                 ? currentDate.toLocaleDateString('ko-KR', {
@@ -973,12 +997,13 @@ const splitEventsForDate = (events: CalendarEvent[], date: Date) => {
   const timedEvents: CalendarEvent[] = [];
 
   events.forEach((event) => {
-    const eventStart = new Date(event.startTime);
-    const eventEnd = new Date(event.endTime);
+    const {
+      start: eventStart,
+      end: eventEnd,
+      isAllDayLike,
+    } = normalizeEventRange(event);
     const spansFullDay =
-      event.isAllDay ||
-      (eventStart <= dayStart && eventEnd >= dayEnd) ||
-      (eventStart.getHours() === 0 && eventEnd.getHours() === 0);
+      isAllDayLike || (eventStart <= dayStart && eventEnd >= dayEnd);
 
     if (spansFullDay) {
       allDayEvents.push(event);
