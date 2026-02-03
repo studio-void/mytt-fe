@@ -213,21 +213,6 @@ const mapCalendar = (calendar: GoogleCalendarListItem): StoredCalendar => ({
   foregroundColor: calendar.foregroundColor,
 });
 
-const upsertManualCalendar = async (uid: string) => {
-  await setDoc(
-    doc(db, 'users', uid, 'calendars', encodeDocId(MANUAL_CALENDAR_ID)),
-    stripUndefined({
-      id: MANUAL_CALENDAR_ID,
-      title: MANUAL_CALENDAR_TITLE,
-      description: '이미지에서 추출한 시간표 일정',
-      isPrimary: false,
-      color: MANUAL_CALENDAR_COLOR,
-      updatedAt: serverTimestamp(),
-    }),
-    { merge: true },
-  );
-};
-
 const mapEvent = (
   event: GoogleCalendarEventItem,
   calendar: StoredCalendar,
