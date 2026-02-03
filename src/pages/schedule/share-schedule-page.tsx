@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { IconCalendar, IconLink } from '@tabler/icons-react';
 import { useNavigate } from '@tanstack/react-router';
-import { Pencil, Plus, RefreshCw } from 'lucide-react';
+import { Edit, Pencil, Plus, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Layout } from '@/components';
@@ -216,7 +216,8 @@ export function ShareSchedulePage() {
         </div>
 
         <div className="border border-gray-200 rounded-lg p-4 sm:p-6 mb-6">
-          <h2 className="text-lg sm:text-xl font-semibold mb-4">
+          <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center gap-2">
+            {editingLinkId ? <Edit /> : <Plus />}
             {editingLinkId ? '공유 링크 수정' : '새 공유 링크 만들기'}
           </h2>
 
