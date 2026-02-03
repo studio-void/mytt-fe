@@ -274,6 +274,34 @@ export function MeetingJoinPage() {
     return map;
   }, [availabilityDocs]);
 
+  const myAvailability = useMemo(
+    () => (user?.uid ? availabilityDocsMap.get(user.uid) : undefined),
+    [availabilityDocsMap, user?.uid],
+  );
+
+  const myBusySlots = useMemo(() => {
+    const slots = new Set<string>();
+    if (!myAvailability || !meetingRange || weekDays.length === 0) {
+      return slots;
+    }
+    weekDays.forEach((day) => {
+      TIME_SLOTS.forEach((slotMinutes) => {
+        const slotStart = addMinutes(day, slotMinutes);
+        const slotEnd = addMinutes(slotStart, SLOT_MINUTES);
+        const inRange =
+          slotStart >= meetingRange.start && slotEnd <= meetingRange.end;
+        if (!inRange) return;
+        const isBusy = myAvailability.busyBlocks.some((block) =>
+          blocksOverlap(slotStart, slotEnd, block),
+        );
+        if (isBusy) {
+          slots.add(slotStart.toISOString());
+        }
+      });
+    });
+    return slots;
+  }, [myAvailability, meetingRange, weekDays]);
+
   const participantList = useMemo(
     () =>
       participants
@@ -628,6 +656,10 @@ export function MeetingJoinPage() {
                   <div className="text-sm text-gray-600">
                     15분 단위로 드래그하여 차단 시간을 선택하세요.
                   </div>
+                  <div className="text-xs text-gray-500">
+                    <span className="inline-block h-2.5 w-2.5 rounded-sm bg-blue-50 border border-blue-100 align-middle mr-1" />
+                    내 캘린더 일정
+                  </div>
                   <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
@@ -707,6 +739,7 @@ export function MeetingJoinPage() {
                               slotEnd <= meetingRange.end;
                             const slotId = slotStart.toISOString();
                             const isBlocked = blockedSlots.has(slotId);
+                            const isCalendarBusy = myBusySlots.has(slotId);
 
                             return (
                               <div
@@ -717,7 +750,9 @@ export function MeetingJoinPage() {
                                   inRange
                                     ? isBlocked
                                       ? 'bg-red-400'
-                                      : 'bg-white hover:bg-red-100'
+                                      : isCalendarBusy
+                                        ? 'bg-blue-50 hover:bg-red-100'
+                                        : 'bg-white hover:bg-red-100'
                                     : 'bg-gray-50'
                                 }`}
                                 style={{ height: SLOT_HEIGHT }}
