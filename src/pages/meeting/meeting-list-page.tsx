@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { useNavigate } from '@tanstack/react-router';
-import { Plus } from 'lucide-react';
+import { Copy, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Layout } from '@/components';
@@ -116,9 +116,21 @@ export function MeetingListPage() {
                   </p>
                 )}
                 <div className="flex items-center justify-between mt-4">
-                  <span className="text-xs text-gray-400">
-                    초대 코드: {meeting.inviteCode}
-                  </span>
+                  <div className="flex items-center gap-2 text-xs text-gray-400">
+                    <span>초대 코드: {meeting.inviteCode}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const link = `${window.location.origin}/meeting/${meeting.inviteCode}`;
+                        navigator.clipboard.writeText(link);
+                        toast.success('초대 링크가 복사되었습니다!');
+                      }}
+                      className="text-gray-400 hover:text-gray-700"
+                      aria-label="초대 링크 복사"
+                    >
+                      <Copy size={14} />
+                    </button>
+                  </div>
                   <Button
                     variant="outline"
                     onClick={() =>
