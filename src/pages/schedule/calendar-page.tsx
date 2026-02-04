@@ -160,6 +160,19 @@ const normalizeDateRange = (startValue: string, endValue: string) => {
   return { start, end };
 };
 
+const sortEventsByStartWithAllDayFirst = (items: CalendarEvent[]) =>
+  [...items].sort((a, b) => {
+    const left = normalizeEventRange(a);
+    const right = normalizeEventRange(b);
+    if (left.isAllDayLike !== right.isAllDayLike) {
+      return left.isAllDayLike ? -1 : 1;
+    }
+    if (left.start.getTime() !== right.start.getTime()) {
+      return left.start.getTime() - right.start.getTime();
+    }
+    return left.end.getTime() - right.end.getTime();
+  });
+
 export function CalendarPage() {
   const navigate = useNavigate();
   const { isAuthenticated, isAuthReady } = useAuthStore();
@@ -541,10 +554,11 @@ weekday는 ISO 기준 숫자(월=1 ... 일=7)로만 출력해.
   const getEventsForDate = (date: Date) => {
     const dayStart = startOfDay(date);
     const dayEnd = endOfDay(date);
-    return events.filter((event) => {
+    const filtered = events.filter((event) => {
       const { start, end } = normalizeEventRange(event);
       return start <= dayEnd && end >= dayStart;
     });
+    return sortEventsByStartWithAllDayFirst(filtered);
   };
 
   const today = new Date();
@@ -562,6 +576,7 @@ weekday는 ISO 기준 숫자(월=1 ... 일=7)로만 출력해.
     () => splitEventsForDate(getEventsForDate(currentDate), currentDate),
     [events, currentDate],
   );
+  const isSidebarToday = isSameDay(sidebarDate, today);
 
   return (
     <Layout disableHeaderHeight>
@@ -1033,7 +1048,12 @@ weekday는 ISO 기준 숫자(월=1 ... 일=7)로만 출력해.
                 sidebarEvents.slice(0, 10).map((event) => (
                   <div
                     key={event.id}
-                    className="p-3 border border-gray-200 rounded-md"
+                    className={`p-3 border border-gray-200 rounded-md ${
+                      isSidebarToday &&
+                      normalizeEventRange(event).end.getTime() < Date.now()
+                        ? 'bg-gray-50'
+                        : 'bg-white'
+                    }`}
                   >
                     <div className="flex items-start gap-2">
                       {event.calendarColor && (
