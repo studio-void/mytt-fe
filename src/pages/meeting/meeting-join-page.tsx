@@ -884,10 +884,10 @@ export function MeetingJoinPage() {
                             }
                             const segmentStart =
                               rec.start > dayStart ? rec.start : dayStart;
-                            const segmentEnd = rec.end < dayEnd ? rec.end : dayEnd;
+                            const segmentEnd =
+                              rec.end < dayEnd ? rec.end : dayEnd;
                             const durationMinutes =
-                              (segmentEnd.getTime() -
-                                segmentStart.getTime()) /
+                              (segmentEnd.getTime() - segmentStart.getTime()) /
                               60000;
                             const offsetMinutes =
                               (segmentStart.getTime() - dayStart.getTime()) /
@@ -1342,10 +1342,10 @@ const buildWeekDays = (weekStart: Date) =>
     return next;
   });
 
-const isSameDay = (left: Date, right: Date) =>
-  left.getFullYear() === right.getFullYear() &&
-  left.getMonth() === right.getMonth() &&
-  left.getDate() === right.getDate();
+// const isSameDay = (left: Date, right: Date) =>
+//   left.getFullYear() === right.getFullYear() &&
+//   left.getMonth() === right.getMonth() &&
+//   left.getDate() === right.getDate();
 
 const getMeetingRange = (startTime: string, endTime: string) => {
   const start = new Date(startTime);
