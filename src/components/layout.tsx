@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { PropsWithChildren } from 'react';
 
 import { useLocation } from '@tanstack/react-router';
@@ -27,7 +27,7 @@ export const Layout: React.FC<
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setPageMeta({
       title: 'MyTT',
       description: '약속 잡기와 일정 공유를 한 곳에서',

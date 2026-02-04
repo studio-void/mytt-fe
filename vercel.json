@@ -1,3 +1,49 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/" }]
+  "rewrites": [
+    {
+      "source": "/meeting/(.*)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*kakaotalk-scrap.*"
+        }
+      ],
+      "destination": "/api/og?path=/meeting/$1"
+    },
+    {
+      "source": "/group/invite/(.*)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*kakaotalk-scrap.*"
+        }
+      ],
+      "destination": "/api/og?path=/group/invite/$1"
+    },
+    {
+      "source": "/group/(.*)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*kakaotalk-scrap.*"
+        }
+      ],
+      "destination": "/api/og?path=/group/$1"
+    },
+    {
+      "source": "/schedule/view/(.*)/(.*)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*kakaotalk-scrap.*"
+        }
+      ],
+      "destination": "/api/og?path=/schedule/view/$1/$2"
+    },
+    { "source": "/(.*)", "destination": "/" }
+  ]
 }
