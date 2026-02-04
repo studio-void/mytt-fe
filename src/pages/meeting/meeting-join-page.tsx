@@ -112,8 +112,8 @@ export function MeetingJoinPage() {
   useEffect(() => {
     if (!meeting) return;
     setPageMeta({
-      title: meeting.title || '약속',
-      description: meeting.description || 'MyTT에서 약속에 참여하세요!',
+      title: meeting.title || 'MyTT',
+      description: meeting.description || '약속 잡기와 일정 공유를 한 곳에서',
     });
   }, [meeting]);
 

@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input';
 import { type GroupRole, groupApi } from '@/services/api/groupApi';
 import { meetingApi } from '@/services/api/meetingApi';
 import { useAuthStore } from '@/store/useAuthStore';
+import { setPageMeta } from '@/utils/meta';
 
 interface GroupInfo {
   id: string;
@@ -83,6 +84,14 @@ export function GroupDetailPage() {
       loadGroup();
     }
   }, [groupId, isAuthenticated, isAuthReady, navigate]);
+
+  useEffect(() => {
+    if (!group) return;
+    setPageMeta({
+      title: group.title || 'MyTT',
+      description: group.description || '약속 잡기는 MyTT',
+    });
+  }, [group]);
 
   const loadGroup = async () => {
     if (!groupId) return;

@@ -8,6 +8,7 @@ import { Layout } from '@/components';
 import { Button } from '@/components/ui/button';
 import { groupApi } from '@/services/api/groupApi';
 import { useAuthStore } from '@/store/useAuthStore';
+import { setPageMeta } from '@/utils/meta';
 
 interface GroupInfo {
   id: string;
@@ -32,6 +33,14 @@ export function GroupJoinPage() {
     }
     loadGroup();
   }, [inviteCode, navigate]);
+
+  useEffect(() => {
+    if (!group) return;
+    setPageMeta({
+      title: group.title || 'MyTT',
+      description: `지금 바로 MyTT의 ${group.title} 그룹에서 약속을 잡아보세요!`,
+    });
+  }, [group]);
 
   const loadGroup = async () => {
     try {
