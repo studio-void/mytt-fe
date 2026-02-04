@@ -1,4 +1,3 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { initializeApp, getApps } from 'firebase/app';
 import {
   collection,
@@ -12,6 +11,14 @@ import {
 } from 'firebase/firestore';
 
 type Meta = { title: string; description: string };
+type ApiRequest = {
+  query: Record<string, string | string[] | undefined>;
+  headers: Record<string, string | string[] | undefined>;
+};
+type ApiResponse = {
+  setHeader: (name: string, value: string) => void;
+  status: (code: number) => { send: (body: string) => void };
+};
 
 const DEFAULT_META: Meta = {
   title: 'MyTT',
@@ -148,7 +155,7 @@ const renderHtml = (meta: Meta, url: string) => {
 </html>`;
 };
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: ApiRequest, res: ApiResponse) {
   try {
     const rawPath = typeof req.query.path === 'string' ? req.query.path : '/';
     const pathname = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
