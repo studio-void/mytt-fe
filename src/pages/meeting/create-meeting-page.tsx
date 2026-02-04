@@ -235,6 +235,13 @@ export function CreateMeetingPage() {
                   </option>
                 ))}
               </select>
+              {formData.groupId && (
+                <p className="mt-2 text-xs text-gray-500">
+                  그룹 약속은 마스터와 매니저만 생성 가능하며, 개인정보 보호를
+                  위해 생성된 약속 링크를 공유한 후 모든 멤버가 직접 동기화해야
+                  일정이 반영됩니다.
+                </p>
+              )}
             </div>
 
             <div className="flex gap-4">

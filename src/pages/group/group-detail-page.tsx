@@ -262,7 +262,7 @@ export function GroupDetailPage() {
                   {group.title}
                 </h1>
                 {myRole !== 'member' && (
-                  <Crown className={`h-4 w-4 ${roleCrownColor[myRole]}`} />
+                  <Crown className={`h-6 w-6 ${roleCrownColor[myRole]}`} />
                 )}
               </div>
               {group.description && (

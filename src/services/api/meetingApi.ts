@@ -203,6 +203,22 @@ const fetchMeetingByInviteCode = async (inviteCode: string) => {
   return { id: docSnap.id, ...(docSnap.data() as MeetingDoc) };
 };
 
+const joinMeetingWithMeeting = async (
+  meeting: { id: string } & MeetingDoc,
+  user: User,
+) => {
+  const participantProfile = await resolveParticipantProfile(user);
+  await upsertParticipant(meeting.id, participantProfile);
+  const existingBlocks = await getExistingManualBlocks(meeting.id, user.uid);
+  await upsertAvailability(
+    meeting.id,
+    user.uid,
+    meeting.startTime.toDate(),
+    meeting.endTime.toDate(),
+    existingBlocks,
+  );
+};
+
 const meetingToClient = (meeting: { id: string } & MeetingDoc) => ({
   id: meeting.id,
   title: meeting.title,
@@ -312,6 +328,11 @@ const upsertAvailability = async (
     },
     { merge: true },
   );
+  return {
+    uid: userId,
+    busyBlocks,
+    manualBlocks,
+  } as AvailabilityDoc;
 };
 
 const getExistingManualBlocks = async (meetingId: string, userId: string) => {
@@ -475,7 +496,8 @@ export const meetingApi = {
     if (!meeting) {
       throw new Error('약속을 찾을 수 없습니다.');
     }
-    await meetingApi.joinMeetingByCode(inviteCode);
+    const user = ensureUser();
+    await joinMeetingWithMeeting(meeting, user);
     return { data: { id: meeting.id } };
   },
 
@@ -526,17 +548,7 @@ export const meetingApi = {
     if (!meeting) {
       throw new Error('약속을 찾을 수 없습니다.');
     }
-
-    const participantProfile = await resolveParticipantProfile(user);
-    await upsertParticipant(meeting.id, participantProfile);
-    const existingBlocks = await getExistingManualBlocks(meeting.id, user.uid);
-    await upsertAvailability(
-      meeting.id,
-      user.uid,
-      meeting.startTime.toDate(),
-      meeting.endTime.toDate(),
-      existingBlocks,
-    );
+    await joinMeetingWithMeeting(meeting, user);
 
     return { data: true };
   },
@@ -566,14 +578,14 @@ export const meetingApi = {
       throw new Error('약속을 찾을 수 없습니다.');
     }
     const meeting = meetingSnap.data() as MeetingDoc;
-    await upsertAvailability(
+    const availability = await upsertAvailability(
       meetingId,
       user.uid,
       meeting.startTime.toDate(),
       meeting.endTime.toDate(),
       blocks,
     );
-    return { data: true };
+    return { data: availability };
   },
 
   getMeetingParticipants: async (inviteCode: string) => {
@@ -671,29 +683,6 @@ export const meetingApi = {
     const availabilityDocs = availabilitySnap.docs.map(
       (docSnap) => docSnap.data() as AvailabilityDoc,
     );
-    const currentUser = auth.currentUser;
-    if (currentUser) {
-      const isParticipant = participants.some(
-        (participant) => participant.uid === currentUser.uid,
-      );
-      const hasAvailability = availabilityDocs.some(
-        (doc) => doc.uid === currentUser.uid,
-      );
-      if (isParticipant && !hasAvailability) {
-        await upsertAvailability(
-          meeting.id,
-          currentUser.uid,
-          meeting.startTime.toDate(),
-          meeting.endTime.toDate(),
-          [],
-        );
-        availabilityDocs.push({
-          uid: currentUser.uid,
-          busyBlocks: [],
-          manualBlocks: [],
-        });
-      }
-    }
     const availabilitySlots = buildAvailabilitySlots(
       meeting.startTime.toDate(),
       meeting.endTime.toDate(),
@@ -701,6 +690,57 @@ export const meetingApi = {
       availabilityDocs,
     );
     return { data: { availabilitySlots, availabilityDocs, participants } };
+  },
+
+  getMeetingContextByCode: async (inviteCode: string) => {
+    const meeting = await fetchMeetingByInviteCode(inviteCode);
+    if (!meeting) {
+      throw new Error('약속을 찾을 수 없습니다.');
+    }
+    const participantsRef = collection(
+      db,
+      'meetings',
+      meeting.id,
+      'participants',
+    );
+    const availabilityRef = collection(
+      db,
+      'meetings',
+      meeting.id,
+      'availability',
+    );
+    const [participantsSnap, availabilitySnap] = await Promise.all([
+      getDocs(query(participantsRef, orderBy('joinedAt'))),
+      getDocs(availabilityRef),
+    ]);
+    const participants = participantsSnap.docs.map(
+      (docSnap) => docSnap.data() as ParticipantDoc,
+    );
+    const availabilityDocs = availabilitySnap.docs.map(
+      (docSnap) => docSnap.data() as AvailabilityDoc,
+    );
+    const availabilitySlots = buildAvailabilitySlots(
+      meeting.startTime.toDate(),
+      meeting.endTime.toDate(),
+      participants,
+      availabilityDocs,
+    );
+    const currentUid = auth.currentUser?.uid;
+    const myAvailability =
+      currentUid === undefined
+        ? null
+        : availabilityDocs.find((docItem) => docItem.uid === currentUid) ??
+          null;
+
+    return {
+      data: {
+        meeting: meetingToClient(meeting),
+        participants,
+        availabilityDocs,
+        availabilitySlots,
+        myAvailability,
+      },
+    };
   },
 
   getMyMeetings: async () => {

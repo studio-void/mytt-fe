@@ -203,11 +203,14 @@ export function CalendarPage() {
   const loadCalendars = async () => {
     try {
       const response = await calendarApi.getCalendars();
-      if (!response.data || response.data.length === 0) {
-        await calendarApi.syncCalendar();
+      let nextCalendars = response.data ?? [];
+      if (nextCalendars.length === 0) {
+        const syncResponse = await calendarApi.syncCalendar();
+        if (syncResponse.error) {
+          throw new Error(syncResponse.error);
+        }
+        nextCalendars = syncResponse.data?.calendars ?? [];
       }
-      const refreshed = await calendarApi.getCalendars();
-      const nextCalendars = refreshed.data ?? [];
       const sorted = [...nextCalendars].sort((a, b) => {
         if (a.isPrimary === b.isPrimary) {
           return a.title.localeCompare(b.title);

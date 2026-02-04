@@ -127,42 +127,29 @@ export function MeetingJoinPage() {
     try {
       setLoading(true);
 
-      // 미팅 정보 조회
-      const meetingResponse = await meetingApi.getMeetingByCode(inviteCode!);
-      setMeeting(meetingResponse.data);
+      const contextResponse = await meetingApi.getMeetingContextByCode(
+        inviteCode!,
+      );
+      setMeeting(contextResponse.data.meeting);
 
       if (!isAuthenticated) {
         setParticipants([]);
         setAvailabilitySlots([]);
+        setAvailabilityDocs([]);
         setHasJoined(false);
         setManualBlocks([]);
         return;
       }
 
       if (isAuthenticated) {
-        // 참가자 정보 조회
-        const participantsResponse = await meetingApi.getMeetingParticipants(
-          inviteCode!,
-        );
-        setParticipants(participantsResponse.data);
-        const joined = participantsResponse.data.some(
+        setParticipants(contextResponse.data.participants ?? []);
+        setAvailabilitySlots(contextResponse.data.availabilitySlots ?? []);
+        setAvailabilityDocs(contextResponse.data.availabilityDocs ?? []);
+        const joined = (contextResponse.data.participants ?? []).some(
           (participant: { uid?: string }) => participant.uid === user?.uid,
         );
         setHasJoined(joined);
-
-        // 가용성 정보 조회
-        const availabilityResponse = await meetingApi.getMeetingAvailability(
-          inviteCode!,
-        );
-        setAvailabilitySlots(availabilityResponse.data.availabilitySlots);
-        setAvailabilityDocs(availabilityResponse.data.availabilityDocs ?? []);
-
-        if (joined && meetingResponse.data?.id) {
-          const myAvailability = await meetingApi.getMyAvailability(
-            meetingResponse.data.id,
-          );
-          setManualBlocks(myAvailability.data?.manualBlocks ?? []);
-        }
+        setManualBlocks(contextResponse.data.myAvailability?.manualBlocks ?? []);
       }
     } catch (error) {
       console.error('Error loading meeting:', error);
@@ -242,12 +229,12 @@ export function MeetingJoinPage() {
     if (!meeting?.id) return;
     try {
       setSavingBlocks(true);
-      await meetingApi.updateManualBlocks(meeting.id, derivedBlocks);
-      const availabilityResponse = await meetingApi.getMeetingAvailability(
-        inviteCode!,
+      const response = await meetingApi.updateManualBlocks(
+        meeting.id,
+        derivedBlocks,
       );
-      setAvailabilitySlots(availabilityResponse.data.availabilitySlots);
-      setAvailabilityDocs(availabilityResponse.data.availabilityDocs ?? []);
+      applyAvailabilityDocUpdate(response.data);
+      setManualBlocks(derivedBlocks);
       toast.success('차단 시간이 저장되었습니다.');
     } catch (error) {
       console.error('Error saving blocks:', error);
@@ -299,12 +286,12 @@ export function MeetingJoinPage() {
       } else {
         toast.success('캘린더가 동기화되었습니다.');
       }
-      await meetingApi.updateManualBlocks(meeting.id, derivedBlocks);
-      const availabilityResponse = await meetingApi.getMeetingAvailability(
-        inviteCode!,
+      const updateResponse = await meetingApi.updateManualBlocks(
+        meeting.id,
+        derivedBlocks,
       );
-      setAvailabilitySlots(availabilityResponse.data.availabilitySlots);
-      setAvailabilityDocs(availabilityResponse.data.availabilityDocs ?? []);
+      applyAvailabilityDocUpdate(updateResponse.data);
+      setManualBlocks(derivedBlocks);
       if (meetingRange) {
         await loadCalendarEvents(meetingRange.start, meetingRange.end);
       }
@@ -414,6 +401,22 @@ export function MeetingJoinPage() {
     () => buildBlocksFromSlots(blockedSlots, meetingRange),
     [blockedSlots, meetingRange],
   );
+
+  const applyAvailabilityDocUpdate = (updated: AvailabilityDoc | undefined) => {
+    if (!updated) return;
+    setAvailabilityDocs((prev) => {
+      const next = upsertAvailabilityDoc(prev, updated);
+      setAvailabilitySlots(
+        buildAvailabilitySlots(
+          meeting?.startTime,
+          meeting?.endTime,
+          participants,
+          next,
+        ),
+      );
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!meetingRange) return;
@@ -1373,6 +1376,83 @@ const getMeetingRange = (startTime: string, endTime: string) => {
     startDay: startOfDay(start),
     endDay: endOfDay(end),
   };
+};
+
+const buildAvailabilitySlots = (
+  startTime: string | undefined,
+  endTime: string | undefined,
+  participants: ParticipantInfo[],
+  availabilityDocs: AvailabilityDoc[],
+) => {
+  if (!startTime || !endTime) return [];
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
+
+  const availabilityMap = new Map<string, AvailabilityDoc>();
+  availabilityDocs.forEach((doc) => availabilityMap.set(doc.uid, doc));
+  const slots: TimeSlot[] = [];
+
+  const rangeStart = new Date(start);
+  const rangeEnd = new Date(end);
+  const cursor = new Date(start);
+  cursor.setHours(0, 0, 0, 0);
+  const endCursor = new Date(end);
+  endCursor.setHours(23, 59, 59, 999);
+
+  for (let slotCursor = new Date(cursor); slotCursor < endCursor; ) {
+    const slotStart = new Date(slotCursor);
+    const slotEnd = addMinutes(slotStart, AVAIL_SLOT_MINUTES);
+    slotCursor = slotEnd;
+
+    if (slotStart < rangeStart || slotEnd > rangeEnd) {
+      continue;
+    }
+
+    let availableCount = 0;
+    participants.forEach((participant) => {
+      const availability = availabilityMap.get(participant.uid);
+      if (!availability) {
+        availableCount += 1;
+        return;
+      }
+      const isBusy = availability.busyBlocks.some((block) =>
+        blocksOverlap(slotStart, slotEnd, block),
+      );
+      if (!isBusy) {
+        availableCount += 1;
+      }
+    });
+
+    const availability = participants.length
+      ? availableCount / participants.length
+      : 0;
+
+    slots.push({
+      startTime: slotStart.toISOString(),
+      endTime: slotEnd.toISOString(),
+      availableCount,
+      availability,
+      isOptimal:
+        participants.length > 0 && availableCount === participants.length,
+    });
+  }
+
+  return slots;
+};
+
+const upsertAvailabilityDoc = (
+  list: AvailabilityDoc[],
+  updated: AvailabilityDoc,
+) => {
+  const next = [...list];
+  const index = next.findIndex((item) => item.uid === updated.uid);
+  if (index === -1) {
+    next.push(updated);
+    return next;
+  }
+  next[index] = updated;
+  return next;
 };
 
 const buildSlotsFromBlocks = (

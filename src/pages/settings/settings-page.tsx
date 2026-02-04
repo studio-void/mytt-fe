@@ -29,6 +29,13 @@ export function SettingsPage() {
   }, [isAuthenticated, isAuthReady, navigate]);
 
   const loadProfile = async () => {
+    if (user?.uid) {
+      setNickname(user.nickname ?? user.displayName ?? user.email ?? '');
+      setPhotoURL(user.photoURL ?? '');
+      setEmail(user.email ?? '');
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const profile = await authApi.getProfile();

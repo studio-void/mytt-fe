@@ -2,6 +2,7 @@ import { addMonths } from 'date-fns';
 import {
   Timestamp,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -10,10 +11,12 @@ import {
   serverTimestamp,
   setDoc,
   where,
-  writeBatch,
 } from 'firebase/firestore';
 
-import { readBucketEvents } from '@/services/api/eventBuckets';
+import {
+  getBucketIdsForRange,
+  readBucketEvents,
+} from '@/services/api/eventBuckets';
 import {
   auth,
   db,
@@ -50,10 +53,22 @@ interface SharedEvent {
   calendarColor?: string;
 }
 
+interface SharedStoredEvent {
+  id: string;
+  title?: string;
+  startTime: Timestamp;
+  endTime: Timestamp;
+  description?: string;
+  location?: string;
+  isBusy: boolean;
+  calendarTitle?: string;
+  calendarColor?: string;
+}
+
 const SHARE_LINKS_COLLECTION = 'shareLinks';
-const SHARE_EVENTS_SUBCOLLECTION = 'events';
+const SHARE_EVENTS_BUCKETS_SUBCOLLECTION = 'eventBuckets';
+const LEGACY_SHARE_EVENTS_SUBCOLLECTION = 'events';
 const SHARE_RANGE_MONTHS = 2;
-const MAX_BATCH_SIZE = 450;
 
 const defaultSettings = {
   privacyLevel: 'busy_only' as PrivacyLevel,
@@ -195,64 +210,134 @@ const buildRange = () => {
 const fetchOwnerEvents = async (ownerUid: string, start: Date, end: Date) =>
   readBucketEvents(ownerUid, start, end);
 
-const replaceShareLinkEvents = async (
+const sortEvents = (events: SharedStoredEvent[]) =>
+  [...events].sort((left, right) => {
+    const timeDiff = left.startTime.toMillis() - right.startTime.toMillis();
+    if (timeDiff !== 0) return timeDiff;
+    return left.id.localeCompare(right.id);
+  });
+
+const serializeEvents = (events: SharedStoredEvent[]) =>
+  sortEvents(events).map((event) =>
+    JSON.stringify({
+      ...event,
+      startTime: event.startTime.toMillis(),
+      endTime: event.endTime.toMillis(),
+    }),
+  );
+
+const areSameEvents = (left: SharedStoredEvent[], right: SharedStoredEvent[]) => {
+  const normalizedLeft = serializeEvents(left);
+  const normalizedRight = serializeEvents(right);
+  if (normalizedLeft.length !== normalizedRight.length) return false;
+  return normalizedLeft.every((value, index) => value === normalizedRight[index]);
+};
+
+const toStoredShareEvent = (
+  event: {
+    id: string;
+    title?: string;
+    description?: string;
+    location?: string;
+    startTime: Timestamp;
+    endTime: Timestamp;
+    isBusy: boolean;
+    calendarTitle?: string;
+    calendarColor?: string;
+  },
+  privacyLevel: PrivacyLevel,
+) => {
+  const mapped = mapEventForPrivacy(event, privacyLevel);
+  return stripUndefined({
+    ...mapped,
+    startTime: Timestamp.fromDate(new Date(mapped.startTime)),
+    endTime: Timestamp.fromDate(new Date(mapped.endTime)),
+  }) as SharedStoredEvent;
+};
+
+const mapStoredEventToClient = (event: SharedStoredEvent): SharedEvent => ({
+  id: event.id,
+  title: event.title,
+  description: event.description,
+  location: event.location,
+  startTime: event.startTime.toDate().toISOString(),
+  endTime: event.endTime.toDate().toISOString(),
+  isBusy: event.isBusy,
+  calendarTitle: event.calendarTitle,
+  calendarColor: event.calendarColor,
+});
+
+const syncShareLinkEventBuckets = async (
   linkDocId: string,
   ownerUid: string,
   privacyLevel: PrivacyLevel,
 ) => {
   const { start, end } = buildRange();
   const sourceEvents = await fetchOwnerEvents(ownerUid, start, end);
-  const shareEventsRef = collection(
-    db,
-    SHARE_LINKS_COLLECTION,
-    linkDocId,
-    SHARE_EVENTS_SUBCOLLECTION,
-  );
-  const existingSnapshot = await getDocs(shareEventsRef);
-
-  const batches: Array<ReturnType<typeof writeBatch>> = [];
-  let batch = writeBatch(db);
-  let batchCount = 0;
-
-  const commitIfNeeded = () => {
-    if (batchCount >= MAX_BATCH_SIZE) {
-      batches.push(batch);
-      batch = writeBatch(db);
-      batchCount = 0;
-    }
-  };
-
-  existingSnapshot.docs.forEach((docSnap) => {
-    batch.delete(docSnap.ref);
-    batchCount += 1;
-    commitIfNeeded();
-  });
+  const bucketIds = getBucketIdsForRange(start, end);
+  const nextByBucket = new Map<string, SharedStoredEvent[]>();
+  bucketIds.forEach((bucketId) => nextByBucket.set(bucketId, []));
 
   sourceEvents.forEach((event) => {
-    const mapped = mapEventForPrivacy(event, privacyLevel);
-    const eventRef = doc(
+    const nextEvent = toStoredShareEvent(event, privacyLevel);
+    const targetBuckets = getBucketIdsForRange(
+      nextEvent.startTime.toDate(),
+      nextEvent.endTime.toDate(),
+    );
+    targetBuckets.forEach((bucketId) => {
+      const events = nextByBucket.get(bucketId);
+      if (!events) return;
+      events.push(nextEvent);
+    });
+  });
+
+  const existingSnaps = await Promise.all(
+    bucketIds.map((bucketId) =>
+      getDoc(
+        doc(
+          db,
+          SHARE_LINKS_COLLECTION,
+          linkDocId,
+          SHARE_EVENTS_BUCKETS_SUBCOLLECTION,
+          bucketId,
+        ),
+      ),
+    ),
+  );
+
+  const writeOps: Array<Promise<void>> = [];
+  bucketIds.forEach((bucketId, index) => {
+    const bucketRef = doc(
       db,
       SHARE_LINKS_COLLECTION,
       linkDocId,
-      SHARE_EVENTS_SUBCOLLECTION,
-      encodeKey(event.id),
+      SHARE_EVENTS_BUCKETS_SUBCOLLECTION,
+      bucketId,
     );
-    batch.set(
-      eventRef,
-      stripUndefined({
-        ...mapped,
-        startTime: Timestamp.fromDate(new Date(mapped.startTime)),
-        endTime: Timestamp.fromDate(new Date(mapped.endTime)),
-        updatedAt: serverTimestamp(),
-      }),
-      { merge: true },
+    const nextEvents = sortEvents(nextByBucket.get(bucketId) ?? []);
+    const existingEvents = existingSnaps[index].exists()
+      ? ((existingSnaps[index].data() as { events?: SharedStoredEvent[] })
+          .events ?? [])
+      : [];
+    if (areSameEvents(existingEvents, nextEvents)) {
+      return;
+    }
+    if (nextEvents.length === 0) {
+      writeOps.push(deleteDoc(bucketRef));
+      return;
+    }
+    writeOps.push(
+      setDoc(
+        bucketRef,
+        {
+          events: nextEvents,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      ),
     );
-    batchCount += 1;
-    commitIfNeeded();
   });
-
-  batches.push(batch);
-  await Promise.all(batches.map((nextBatch) => nextBatch.commit()));
+  await Promise.all(writeOps);
 
   await setDoc(
     doc(db, SHARE_LINKS_COLLECTION, linkDocId),
@@ -336,7 +421,7 @@ export const sharingApi = {
       { merge: true },
     );
 
-    await replaceShareLinkEvents(linkDocId, user.uid, data.privacyLevel);
+    await syncShareLinkEventBuckets(linkDocId, user.uid, data.privacyLevel);
 
     return { data: payload };
   },
@@ -376,7 +461,9 @@ export const sharingApi = {
       { merge: true },
     );
 
-    await replaceShareLinkEvents(linkDocId, user.uid, data.privacyLevel);
+    if (existing.privacyLevel !== data.privacyLevel) {
+      await syncShareLinkEventBuckets(linkDocId, user.uid, data.privacyLevel);
+    }
 
     return {
       data: {
@@ -397,34 +484,27 @@ export const sharingApi = {
     if (existing.ownerUid !== user.uid) {
       throw new Error('삭제 권한이 없습니다.');
     }
-    const eventsRef = collection(
+    const bucketDocs = await getDocs(
+      collection(
+        db,
+        SHARE_LINKS_COLLECTION,
+        linkDocId,
+        SHARE_EVENTS_BUCKETS_SUBCOLLECTION,
+      ),
+    );
+    const legacyEventsRef = collection(
       db,
       SHARE_LINKS_COLLECTION,
       linkDocId,
-      SHARE_EVENTS_SUBCOLLECTION,
+      LEGACY_SHARE_EVENTS_SUBCOLLECTION,
     );
-    const eventsSnap = await getDocs(eventsRef);
-    const batches: Array<ReturnType<typeof writeBatch>> = [];
-    let batch = writeBatch(db);
-    let batchCount = 0;
+    const legacyEventsSnap = await getDocs(legacyEventsRef);
 
-    const commitIfNeeded = () => {
-      if (batchCount >= MAX_BATCH_SIZE) {
-        batches.push(batch);
-        batch = writeBatch(db);
-        batchCount = 0;
-      }
-    };
-
-    eventsSnap.docs.forEach((docSnap) => {
-      batch.delete(docSnap.ref);
-      batchCount += 1;
-      commitIfNeeded();
-    });
-
-    batch.delete(doc(db, SHARE_LINKS_COLLECTION, linkDocId));
-    batches.push(batch);
-    await Promise.all(batches.map((nextBatch) => nextBatch.commit()));
+    await Promise.all([
+      ...bucketDocs.docs.map((docSnap) => deleteDoc(docSnap.ref)),
+      ...legacyEventsSnap.docs.map((docSnap) => deleteDoc(docSnap.ref)),
+      deleteDoc(doc(db, SHARE_LINKS_COLLECTION, linkDocId)),
+    ]);
 
     return { data: true };
   },
@@ -444,7 +524,7 @@ export const sharingApi = {
     }));
 
     for (const link of links) {
-      await replaceShareLinkEvents(link.id, user.uid, link.privacyLevel);
+      await syncShareLinkEventBuckets(link.id, user.uid, link.privacyLevel);
     }
 
     return { data: true };
@@ -497,21 +577,27 @@ export const sharingApi = {
 
     const { start, end } = buildRange();
 
-    const eventsRef = collection(
-      db,
-      SHARE_LINKS_COLLECTION,
-      linkDocId,
-      SHARE_EVENTS_SUBCOLLECTION,
-    );
-    let eventsSnapshot;
+    const bucketIds = getBucketIdsForRange(start, end);
+    let bucketEvents: SharedStoredEvent[] = [];
     try {
-      eventsSnapshot = await getDocs(
-        query(
-          eventsRef,
-          where('startTime', '<=', Timestamp.fromDate(end)),
-          orderBy('startTime'),
+      const bucketSnaps = await Promise.all(
+        bucketIds.map((bucketId) =>
+          getDoc(
+            doc(
+              db,
+              SHARE_LINKS_COLLECTION,
+              linkDocId,
+              SHARE_EVENTS_BUCKETS_SUBCOLLECTION,
+              bucketId,
+            ),
+          ),
         ),
       );
+      bucketEvents = bucketSnaps.flatMap((bucketSnap) => {
+        if (!bucketSnap.exists()) return [];
+        const data = bucketSnap.data() as { events?: SharedStoredEvent[] };
+        return data.events ?? [];
+      });
     } catch (error) {
       if (isFirestorePermissionError(error)) {
         return { error: 'access_denied', data: null };
@@ -519,22 +605,46 @@ export const sharingApi = {
       throw error;
     }
 
-    const events = eventsSnapshot.docs
-      .map((docSnap) => ({
-        id: docSnap.id,
-        ...(docSnap.data() as {
-          title?: string;
-          description?: string;
-          location?: string;
-          startTime: Timestamp;
-          endTime: Timestamp;
-          isBusy: boolean;
-          calendarTitle?: string;
-          calendarColor?: string;
-        }),
-      }))
-      .filter((event) => event.endTime.toDate() >= start)
-      .map((event) => mapEventForPrivacy(event, link.privacyLevel));
+    if (bucketEvents.length === 0) {
+      const legacyEventsRef = collection(
+        db,
+        SHARE_LINKS_COLLECTION,
+        linkDocId,
+        LEGACY_SHARE_EVENTS_SUBCOLLECTION,
+      );
+      try {
+        const legacySnapshot = await getDocs(
+          query(
+            legacyEventsRef,
+            where('startTime', '<=', Timestamp.fromDate(end)),
+            orderBy('startTime'),
+          ),
+        );
+        bucketEvents = legacySnapshot.docs.map((docSnap) => ({
+          ...(docSnap.data() as SharedStoredEvent),
+          id: docSnap.id,
+        }));
+      } catch (error) {
+        if (isFirestorePermissionError(error)) {
+          return { error: 'access_denied', data: null };
+        }
+        throw error;
+      }
+    }
+
+    const deduped = new Map<string, SharedStoredEvent>();
+    bucketEvents.forEach((event) => {
+      const key = `${event.id}__${event.startTime.toMillis()}__${event.endTime.toMillis()}`;
+      deduped.set(key, event);
+    });
+
+    const events = Array.from(deduped.values())
+      .filter(
+        (event) =>
+          event.startTime.toDate() <= end && event.endTime.toDate() >= start,
+      )
+      .sort((left, right) => left.startTime.toMillis() - right.startTime.toMillis())
+      .map((event) => mapStoredEventToClient(event));
 
     let ownerNickname = link.ownerNickname ?? null;
     let ownerPhotoURL = link.ownerPhotoURL ?? null;

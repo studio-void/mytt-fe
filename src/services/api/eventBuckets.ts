@@ -60,6 +60,11 @@ export const getBucketIdForMonth = (date: Date) => bucketIdForDate(date);
 const bucketIdsForEvent = (event: WritableEvent) =>
   getBucketIdsForRange(event.startTime, event.endTime);
 
+const bucketCache = new Map<string, BucketEvent[]>();
+
+const getBucketCacheKey = (uid: string, bucketId: string) =>
+  `${uid}::${bucketId}`;
+
 export const writeEventBuckets = async (
   uid: string,
   events: WritableEvent[],
@@ -89,6 +94,7 @@ export const writeEventBuckets = async (
           endTime: Timestamp.fromDate(event.endTime),
         }),
       );
+      bucketCache.set(getBucketCacheKey(uid, bucketId), payload as BucketEvent[]);
 
       return setDoc(
         doc(db, 'users', uid, 'eventBuckets', bucketId),
@@ -104,20 +110,32 @@ export const writeEventBuckets = async (
   await Promise.all(writes);
 };
 
+const readMonthBucketEventsCached = async (uid: string, bucketId: string) => {
+  const cacheKey = getBucketCacheKey(uid, bucketId);
+  const cached = bucketCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+  const snap = await getDoc(doc(db, 'users', uid, 'eventBuckets', bucketId));
+  if (!snap.exists()) {
+    bucketCache.set(cacheKey, []);
+    return [];
+  }
+  const data = snap.data() as { events?: BucketEvent[] };
+  const events = data.events ?? [];
+  bucketCache.set(cacheKey, events);
+  return events;
+};
+
 export const readBucketEvents = async (uid: string, start: Date, end: Date) => {
   const bucketIds = getBucketIdsForRange(start, end);
-  const snapshots = await Promise.all(
-    bucketIds.map((bucketId) =>
-      getDoc(doc(db, 'users', uid, 'eventBuckets', bucketId)),
-    ),
-  );
-
   const events: BucketEvent[] = [];
   const seen = new Set<string>();
-  snapshots.forEach((snap) => {
-    if (!snap.exists()) return;
-    const data = snap.data() as { events?: BucketEvent[] };
-    (data.events ?? []).forEach((event) => {
+  const buckets = await Promise.all(
+    bucketIds.map((bucketId) => readMonthBucketEventsCached(uid, bucketId)),
+  );
+  buckets.forEach((bucketEvents) => {
+    bucketEvents.forEach((event) => {
       const key = `${event.calendarId}__${event.id}`;
       if (seen.has(key)) return;
       seen.add(key);
@@ -133,8 +151,5 @@ export const readBucketEvents = async (uid: string, start: Date, end: Date) => {
 
 export const readMonthBucketEvents = async (uid: string, date: Date) => {
   const bucketId = getBucketIdForMonth(date);
-  const snap = await getDoc(doc(db, 'users', uid, 'eventBuckets', bucketId));
-  if (!snap.exists()) return [];
-  const data = snap.data() as { events?: BucketEvent[] };
-  return data.events ?? [];
+  return readMonthBucketEventsCached(uid, bucketId);
 };
