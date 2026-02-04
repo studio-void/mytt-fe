@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import {
   Check,
   Copy,
+  Crown,
   LogIn,
   LogOut,
   RefreshCw,
@@ -711,6 +712,7 @@ export function MeetingJoinPage() {
                     participant.uid ??
                     '알 수 없음';
                   const fallback = label.slice(0, 2).toUpperCase();
+                  const isHost = participant.uid === meeting.hostUid;
                   return (
                     <div
                       key={index}
@@ -727,7 +729,17 @@ export function MeetingJoinPage() {
                           fallback
                         )}
                       </span>
-                      <span>{label}</span>
+                      <span className="inline-flex items-center gap-1">
+                        {label}
+                        {isHost && (
+                          <span className="relative group inline-flex items-center">
+                            <Crown className="h-3.5 w-3.5 text-amber-500" />
+                            <span className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[10px] text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
+                              주최자
+                            </span>
+                          </span>
+                        )}
+                      </span>
                     </div>
                   );
                 })}
