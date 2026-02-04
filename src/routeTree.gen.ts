@@ -13,13 +13,16 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MeetingIndexRouteImport } from './routes/meeting/index'
+import { Route as GroupIndexRouteImport } from './routes/group/index'
 import { Route as ScheduleShareRouteImport } from './routes/schedule/share'
 import { Route as ScheduleCalendarRouteImport } from './routes/schedule/calendar'
 import { Route as MeetingJoinRouteImport } from './routes/meeting/join'
 import { Route as MeetingCreateRouteImport } from './routes/meeting/create'
 import { Route as MeetingInviteCodeRouteImport } from './routes/meeting/$inviteCode'
+import { Route as GroupGroupIdRouteImport } from './routes/group/$groupId'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
+import { Route as GroupInviteInviteCodeRouteImport } from './routes/group/invite/$inviteCode'
 import { Route as ScheduleViewUidIdRouteImport } from './routes/schedule/view/$uid/$id'
 
 const SettingsRoute = SettingsRouteImport.update({
@@ -40,6 +43,11 @@ const IndexRoute = IndexRouteImport.update({
 const MeetingIndexRoute = MeetingIndexRouteImport.update({
   id: '/meeting/',
   path: '/meeting/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GroupIndexRoute = GroupIndexRouteImport.update({
+  id: '/group/',
+  path: '/group/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ScheduleShareRoute = ScheduleShareRouteImport.update({
@@ -67,6 +75,11 @@ const MeetingInviteCodeRoute = MeetingInviteCodeRouteImport.update({
   path: '/meeting/$inviteCode',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GroupGroupIdRoute = GroupGroupIdRouteImport.update({
+  id: '/group/$groupId',
+  path: '/group/$groupId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthLoginRoute = AuthLoginRouteImport.update({
   id: '/auth/login',
   path: '/auth/login',
@@ -75,6 +88,11 @@ const AuthLoginRoute = AuthLoginRouteImport.update({
 const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/auth/callback',
   path: '/auth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GroupInviteInviteCodeRoute = GroupInviteInviteCodeRouteImport.update({
+  id: '/group/invite/$inviteCode',
+  path: '/group/invite/$inviteCode',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ScheduleViewUidIdRoute = ScheduleViewUidIdRouteImport.update({
@@ -89,12 +107,15 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
+  '/group/$groupId': typeof GroupGroupIdRoute
   '/meeting/$inviteCode': typeof MeetingInviteCodeRoute
   '/meeting/create': typeof MeetingCreateRoute
   '/meeting/join': typeof MeetingJoinRoute
   '/schedule/calendar': typeof ScheduleCalendarRoute
   '/schedule/share': typeof ScheduleShareRoute
+  '/group': typeof GroupIndexRoute
   '/meeting': typeof MeetingIndexRoute
+  '/group/invite/$inviteCode': typeof GroupInviteInviteCodeRoute
   '/schedule/view/$uid/$id': typeof ScheduleViewUidIdRoute
 }
 export interface FileRoutesByTo {
@@ -103,12 +124,15 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
+  '/group/$groupId': typeof GroupGroupIdRoute
   '/meeting/$inviteCode': typeof MeetingInviteCodeRoute
   '/meeting/create': typeof MeetingCreateRoute
   '/meeting/join': typeof MeetingJoinRoute
   '/schedule/calendar': typeof ScheduleCalendarRoute
   '/schedule/share': typeof ScheduleShareRoute
+  '/group': typeof GroupIndexRoute
   '/meeting': typeof MeetingIndexRoute
+  '/group/invite/$inviteCode': typeof GroupInviteInviteCodeRoute
   '/schedule/view/$uid/$id': typeof ScheduleViewUidIdRoute
 }
 export interface FileRoutesById {
@@ -118,12 +142,15 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
+  '/group/$groupId': typeof GroupGroupIdRoute
   '/meeting/$inviteCode': typeof MeetingInviteCodeRoute
   '/meeting/create': typeof MeetingCreateRoute
   '/meeting/join': typeof MeetingJoinRoute
   '/schedule/calendar': typeof ScheduleCalendarRoute
   '/schedule/share': typeof ScheduleShareRoute
+  '/group/': typeof GroupIndexRoute
   '/meeting/': typeof MeetingIndexRoute
+  '/group/invite/$inviteCode': typeof GroupInviteInviteCodeRoute
   '/schedule/view/$uid/$id': typeof ScheduleViewUidIdRoute
 }
 export interface FileRouteTypes {
@@ -134,12 +161,15 @@ export interface FileRouteTypes {
     | '/settings'
     | '/auth/callback'
     | '/auth/login'
+    | '/group/$groupId'
     | '/meeting/$inviteCode'
     | '/meeting/create'
     | '/meeting/join'
     | '/schedule/calendar'
     | '/schedule/share'
+    | '/group'
     | '/meeting'
+    | '/group/invite/$inviteCode'
     | '/schedule/view/$uid/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -148,12 +178,15 @@ export interface FileRouteTypes {
     | '/settings'
     | '/auth/callback'
     | '/auth/login'
+    | '/group/$groupId'
     | '/meeting/$inviteCode'
     | '/meeting/create'
     | '/meeting/join'
     | '/schedule/calendar'
     | '/schedule/share'
+    | '/group'
     | '/meeting'
+    | '/group/invite/$inviteCode'
     | '/schedule/view/$uid/$id'
   id:
     | '__root__'
@@ -162,12 +195,15 @@ export interface FileRouteTypes {
     | '/settings'
     | '/auth/callback'
     | '/auth/login'
+    | '/group/$groupId'
     | '/meeting/$inviteCode'
     | '/meeting/create'
     | '/meeting/join'
     | '/schedule/calendar'
     | '/schedule/share'
+    | '/group/'
     | '/meeting/'
+    | '/group/invite/$inviteCode'
     | '/schedule/view/$uid/$id'
   fileRoutesById: FileRoutesById
 }
@@ -177,12 +213,15 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   AuthLoginRoute: typeof AuthLoginRoute
+  GroupGroupIdRoute: typeof GroupGroupIdRoute
   MeetingInviteCodeRoute: typeof MeetingInviteCodeRoute
   MeetingCreateRoute: typeof MeetingCreateRoute
   MeetingJoinRoute: typeof MeetingJoinRoute
   ScheduleCalendarRoute: typeof ScheduleCalendarRoute
   ScheduleShareRoute: typeof ScheduleShareRoute
+  GroupIndexRoute: typeof GroupIndexRoute
   MeetingIndexRoute: typeof MeetingIndexRoute
+  GroupInviteInviteCodeRoute: typeof GroupInviteInviteCodeRoute
   ScheduleViewUidIdRoute: typeof ScheduleViewUidIdRoute
 }
 
@@ -214,6 +253,13 @@ declare module '@tanstack/react-router' {
       path: '/meeting'
       fullPath: '/meeting'
       preLoaderRoute: typeof MeetingIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/group/': {
+      id: '/group/'
+      path: '/group'
+      fullPath: '/group'
+      preLoaderRoute: typeof GroupIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/schedule/share': {
@@ -251,6 +297,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MeetingInviteCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/group/$groupId': {
+      id: '/group/$groupId'
+      path: '/group/$groupId'
+      fullPath: '/group/$groupId'
+      preLoaderRoute: typeof GroupGroupIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth/login': {
       id: '/auth/login'
       path: '/auth/login'
@@ -263,6 +316,13 @@ declare module '@tanstack/react-router' {
       path: '/auth/callback'
       fullPath: '/auth/callback'
       preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/group/invite/$inviteCode': {
+      id: '/group/invite/$inviteCode'
+      path: '/group/invite/$inviteCode'
+      fullPath: '/group/invite/$inviteCode'
+      preLoaderRoute: typeof GroupInviteInviteCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/schedule/view/$uid/$id': {
@@ -281,12 +341,15 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   AuthLoginRoute: AuthLoginRoute,
+  GroupGroupIdRoute: GroupGroupIdRoute,
   MeetingInviteCodeRoute: MeetingInviteCodeRoute,
   MeetingCreateRoute: MeetingCreateRoute,
   MeetingJoinRoute: MeetingJoinRoute,
   ScheduleCalendarRoute: ScheduleCalendarRoute,
   ScheduleShareRoute: ScheduleShareRoute,
+  GroupIndexRoute: GroupIndexRoute,
   MeetingIndexRoute: MeetingIndexRoute,
+  GroupInviteInviteCodeRoute: GroupInviteInviteCodeRoute,
   ScheduleViewUidIdRoute: ScheduleViewUidIdRoute,
 }
 export const routeTree = rootRouteImport

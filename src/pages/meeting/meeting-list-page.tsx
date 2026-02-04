@@ -18,6 +18,8 @@ interface MeetingSummary {
   endTime: string;
   timezone?: string;
   inviteCode: string;
+  groupId?: string | null;
+  groupTitle?: string | null;
 }
 
 export function MeetingListPage() {
@@ -143,6 +145,11 @@ export function MeetingListPage() {
                         {formatDateTime(meeting.startTime)} -{' '}
                         {formatDateTime(meeting.endTime)}
                       </p>
+                      {meeting.groupTitle && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          그룹: {meeting.groupTitle}
+                        </p>
+                      )}
                       {meeting.timezone && (
                         <p className="text-xs text-gray-400 mt-1">
                           시간대: {meeting.timezone}

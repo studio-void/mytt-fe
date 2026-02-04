@@ -4,6 +4,7 @@ import {
   IconCalendar,
   IconCalendarEvent,
   IconLink,
+  IconUsersGroup,
   // IconMail,
 } from '@tabler/icons-react';
 import { useNavigate } from '@tanstack/react-router';
@@ -31,6 +32,10 @@ export const DashboardPage: React.FC = () => {
 
   const handleViewCalendar = () => {
     navigate({ to: '/schedule/calendar' });
+  };
+
+  const handleGroup = () => {
+    navigate({ to: '/group' });
   };
 
   return (
@@ -90,6 +95,21 @@ export const DashboardPage: React.FC = () => {
               </h3>
               <p className="text-gray-600 text-sm leading-relaxed">
                 Google Calendar와 동기화된 내 일정을 확인하세요
+              </p>
+            </button>
+
+            <button
+              onClick={handleGroup}
+              className="p-5 sm:p-8 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors text-left group"
+            >
+              <div className="mb-4 text-gray-800">
+                <IconUsersGroup size={40} stroke={1.7} />
+              </div>
+              <h3 className="text-lg sm:text-xl font-semibold mb-3 group-hover:text-gray-900">
+                내 그룹
+              </h3>
+              <p className="text-gray-600 text-sm leading-relaxed">
+                그룹을 만들고 멤버와 약속을 함께 관리하세요
               </p>
             </button>
 

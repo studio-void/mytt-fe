@@ -622,6 +622,11 @@ export function MeetingJoinPage() {
                   {formatDate(meeting.endTime)}
                 </p>
                 <p>시간대: {meeting.timezone}</p>
+                {meeting.groupTitle && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    그룹: {meeting.groupTitle}
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">

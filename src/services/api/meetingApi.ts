@@ -30,6 +30,8 @@ interface MeetingDoc {
   timezone?: string;
   hostUid: string;
   inviteCode: string;
+  groupId?: string | null;
+  groupTitle?: string | null;
   createdAt?: Timestamp;
 }
 
@@ -40,6 +42,15 @@ interface ParticipantDoc {
   nickname: string | null;
   photoURL: string | null;
   joinedAt?: Timestamp;
+}
+
+interface GroupMemberDoc {
+  uid: string;
+  role: 'master' | 'manager' | 'member';
+  email: string | null;
+  displayName: string | null;
+  nickname: string | null;
+  photoURL: string | null;
 }
 
 interface AvailabilityDoc {
@@ -201,6 +212,8 @@ const meetingToClient = (meeting: { id: string } & MeetingDoc) => ({
   timezone: meeting.timezone,
   hostUid: meeting.hostUid,
   inviteCode: meeting.inviteCode,
+  groupId: meeting.groupId ?? null,
+  groupTitle: meeting.groupTitle ?? null,
   createdAt: meeting.createdAt?.toDate().toISOString() ?? null,
 });
 
@@ -236,6 +249,41 @@ const upsertParticipant = async (meetingId: string, user: ParticipantDoc) => {
     },
     { merge: true },
   );
+};
+
+const seedAvailability = async (meetingId: string, userId: string) => {
+  const availabilityRef = doc(
+    db,
+    'meetings',
+    meetingId,
+    'availability',
+    userId,
+  );
+  await setDoc(
+    availabilityRef,
+    {
+      uid: userId,
+      busyBlocks: [],
+      manualBlocks: [],
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+};
+
+const getGroupMeta = async (groupId: string) => {
+  const groupSnap = await getDoc(doc(db, 'groups', groupId));
+  if (!groupSnap.exists()) {
+    throw new Error('그룹을 찾을 수 없습니다.');
+  }
+  const data = groupSnap.data() as { title?: string | null };
+  return { groupTitle: data.title ?? null };
+};
+
+const getGroupMembers = async (groupId: string) => {
+  const membersRef = collection(db, 'groups', groupId, 'members');
+  const snapshot = await getDocs(membersRef);
+  return snapshot.docs.map((docSnap) => docSnap.data() as GroupMemberDoc);
 };
 
 const upsertAvailability = async (
@@ -347,12 +395,14 @@ export const meetingApi = {
     startTime: string;
     endTime: string;
     timezone?: string;
+    groupId?: string | null;
   }) => {
     const user = ensureUser();
     const inviteCode = await generateUniqueInviteCode();
     const meetingRef = doc(collection(db, 'meetings'));
     const startDate = new Date(data.startTime);
     const endDate = new Date(data.endTime);
+    const groupMeta = data.groupId ? await getGroupMeta(data.groupId) : null;
     const meetingData: MeetingDoc = {
       title: data.title,
       description: data.description,
@@ -361,6 +411,8 @@ export const meetingApi = {
       timezone: data.timezone,
       hostUid: user.uid,
       inviteCode,
+      groupId: data.groupId ?? null,
+      groupTitle: groupMeta?.groupTitle ?? null,
       createdAt: Timestamp.fromDate(new Date()),
     };
     await setDoc(meetingRef, {
@@ -392,6 +444,23 @@ export const meetingApi = {
       },
       { merge: true },
     );
+
+    if (data.groupId) {
+      const groupMembers = await getGroupMembers(data.groupId);
+      await Promise.all(
+        groupMembers.map(async (member) => {
+          if (member.uid === user.uid) return;
+          await upsertParticipant(meetingRef.id, {
+            uid: member.uid,
+            email: member.email,
+            displayName: member.displayName,
+            nickname: member.nickname,
+            photoURL: member.photoURL,
+          });
+          await seedAvailability(meetingRef.id, member.uid);
+        }),
+      );
+    }
 
     return {
       data: {
@@ -716,6 +785,22 @@ export const meetingApi = {
 
     const sorted = [...upcoming, ...past];
     return { data: sorted };
+  },
+
+  getMeetingsByGroup: async (groupId: string) => {
+    const meetingsRef = collection(db, 'meetings');
+    const snapshot = await getDocs(
+      query(meetingsRef, where('groupId', '==', groupId)),
+    );
+    const meetings = snapshot.docs.map((docSnap) =>
+      meetingToClient({ id: docSnap.id, ...(docSnap.data() as MeetingDoc) }),
+    );
+    meetings.sort((a, b) => {
+      const aStart = a.startTime ? new Date(a.startTime).getTime() : 0;
+      const bStart = b.startTime ? new Date(b.startTime).getTime() : 0;
+      return aStart - bStart;
+    });
+    return { data: meetings };
   },
 
   getMyAvailability: async (meetingId: string) => {

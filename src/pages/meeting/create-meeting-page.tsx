@@ -9,6 +9,7 @@ import { Layout } from '@/components';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { calendarApi } from '@/services/api/calendarApi';
+import { groupApi, type GroupRole } from '@/services/api/groupApi';
 import { meetingApi } from '@/services/api/meetingApi';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -17,12 +18,16 @@ export function CreateMeetingPage() {
   const { isAuthenticated, isAuthReady } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [manualSyncing, setManualSyncing] = useState(false);
+  const [groups, setGroups] = useState<
+    Array<{ id: string; title: string; role: GroupRole }>
+  >([]);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     startTime: '',
     endTime: '',
     timezone: 'Asia/Seoul',
+    groupId: '',
   });
 
   const handleInputChange = (
@@ -40,8 +45,37 @@ export function CreateMeetingPage() {
   useEffect(() => {
     if (isAuthReady && !isAuthenticated) {
       navigate({ to: '/auth/login' });
+      return;
+    }
+    if (isAuthenticated) {
+      loadGroups();
     }
   }, [isAuthenticated, isAuthReady, navigate]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const groupId = params.get('groupId');
+    if (!groupId) return;
+    setFormData((prev) => ({ ...prev, groupId }));
+  }, []);
+
+  const loadGroups = async () => {
+    try {
+      const response = await groupApi.getMyGroups();
+      const available = (response.data ?? [])
+        .filter(
+          (group) => group.role === 'master' || group.role === 'manager',
+        )
+        .map((group) => ({
+          id: group.id,
+          title: group.title,
+          role: group.role,
+        }));
+      setGroups(available);
+    } catch (error) {
+      console.error('Error loading groups:', error);
+    }
+  };
 
   const handleCreateMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,6 +94,7 @@ export function CreateMeetingPage() {
         startTime: new Date(formData.startTime).toISOString(),
         endTime: new Date(formData.endTime).toISOString(),
         timezone: formData.timezone,
+        groupId: formData.groupId || null,
       });
 
       const inviteCode = response.data.inviteCode;
@@ -180,6 +215,25 @@ export function CreateMeetingPage() {
                 </option>
                 <option value="Europe/London">런던 (Europe/London)</option>
                 <option value="Asia/Tokyo">도쿄 (Asia/Tokyo)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                그룹 (선택)
+              </label>
+              <select
+                name="groupId"
+                value={formData.groupId}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-200 rounded-md bg-white"
+              >
+                <option value="">개인 약속</option>
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.title}
+                  </option>
+                ))}
               </select>
             </div>
 
