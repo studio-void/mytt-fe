@@ -315,6 +315,19 @@ export const groupApi = {
     return { data: { success: true } };
   },
 
+  updateGroup: async (groupId: string, data: { title: string; description?: string }) => {
+    await setDoc(
+      doc(db, 'groups', groupId),
+      {
+        title: data.title,
+        ...(data.description ? { description: data.description } : { description: '' }),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+    return { data: { success: true } };
+  },
+
   deleteGroup: async (groupId: string) => {
     await deleteSubcollection(['groups', groupId, 'members']);
     await deleteDoc(doc(db, 'groups', groupId));

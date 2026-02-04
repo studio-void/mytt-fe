@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { Layout } from '@/components';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { groupApi, type GroupRole } from '@/services/api/groupApi';
+import { type GroupRole, groupApi } from '@/services/api/groupApi';
 import { useAuthStore } from '@/store/useAuthStore';
 
 interface GroupSummary {
@@ -18,13 +18,8 @@ interface GroupSummary {
   masterUid: string;
   createdAt?: string | null;
   role: GroupRole;
+  memberCount?: number;
 }
-
-const roleLabel: Record<GroupRole, string> = {
-  master: '마스터',
-  manager: '매니저',
-  member: '멤버',
-};
 
 const roleCrownColor: Record<GroupRole, string> = {
   master: 'text-amber-500',
@@ -54,7 +49,17 @@ export function GroupListPage() {
     try {
       setLoading(true);
       const response = await groupApi.getMyGroups();
-      setGroups((response.data ?? []) as GroupSummary[]);
+      const baseGroups = (response.data ?? []) as GroupSummary[];
+      const groupsWithCount = await Promise.all(
+        baseGroups.map(async (group) => {
+          const membersResponse = await groupApi.getGroupMembers(group.id);
+          return {
+            ...group,
+            memberCount: membersResponse.data?.length ?? 0,
+          };
+        }),
+      );
+      setGroups(groupsWithCount);
     } catch (error) {
       console.error('Error loading groups:', error);
       toast.error('그룹을 불러오는데 실패했습니다.');
@@ -170,16 +175,14 @@ export function GroupListPage() {
                       )}
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      내 역할: {roleLabel[group.role]}
+                      멤버 {group.memberCount ?? 0}명
                     </p>
                   </div>
                   <Button
                     variant="outline"
-                    onClick={() =>
-                      navigate({ to: `/group/${group.id}` })
-                    }
+                    onClick={() => navigate({ to: `/group/${group.id}` })}
                   >
-                    관리하기
+                    그룹 보기
                   </Button>
                 </div>
                 {group.description && (

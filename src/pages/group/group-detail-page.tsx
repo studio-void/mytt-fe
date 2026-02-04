@@ -9,6 +9,7 @@ import {
   Crown,
   ExternalLink,
   LogOut,
+  Pencil,
   Trash,
   User,
   UserMinus,
@@ -17,6 +18,7 @@ import { toast } from 'sonner';
 
 import { Layout } from '@/components';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { type GroupRole, groupApi } from '@/services/api/groupApi';
 import { meetingApi } from '@/services/api/meetingApi';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -68,6 +70,9 @@ export function GroupDetailPage() {
   const [groupMeetings, setGroupMeetings] = useState<MeetingSummary[]>([]);
   const [updating, setUpdating] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
+  const [editingGroup, setEditingGroup] = useState(false);
+  const [groupTitle, setGroupTitle] = useState('');
+  const [groupDescription, setGroupDescription] = useState('');
 
   useEffect(() => {
     if (isAuthReady && !isAuthenticated) {
@@ -88,6 +93,8 @@ export function GroupDetailPage() {
         groupApi.getGroupMembers(groupId),
       ]);
       setGroup(groupResponse.data as GroupInfo);
+      setGroupTitle((groupResponse.data as GroupInfo).title);
+      setGroupDescription((groupResponse.data as GroupInfo).description ?? '');
       setMembers(membersResponse.data as MemberInfo[]);
       const meetingsResponse = await meetingApi.getMeetingsByGroup(groupId);
       setGroupMeetings(meetingsResponse.data as MeetingSummary[]);
@@ -191,6 +198,29 @@ export function GroupDetailPage() {
     window.location.href = `/meeting/create?groupId=${encodeURIComponent(groupId)}`;
   };
 
+  const handleUpdateGroup = async () => {
+    if (!groupId) return;
+    if (!groupTitle.trim()) {
+      toast.error('그룹 이름을 입력해주세요.');
+      return;
+    }
+    try {
+      setUpdating(true);
+      await groupApi.updateGroup(groupId, {
+        title: groupTitle.trim(),
+        description: groupDescription.trim() || undefined,
+      });
+      toast.success('그룹 정보가 수정되었습니다.');
+      setEditingGroup(false);
+      await loadGroup();
+    } catch (error) {
+      console.error('Error updating group:', error);
+      toast.error('그룹 정보 수정에 실패했습니다.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   const formatDateTime = (value: string) =>
     new Date(value).toLocaleString('ko-KR', {
       year: 'numeric',
@@ -241,6 +271,18 @@ export function GroupDetailPage() {
               <p className="text-xs text-gray-500 mt-2">
                 내 역할: {roleLabel[myRole]}
               </p>
+              {myRole === 'master' && (
+                <div className="mt-3">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setEditingGroup((prev) => !prev)}
+                  >
+                    <Pencil />
+                    {editingGroup ? '수정 취소' : '그룹 정보 수정'}
+                  </Button>
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" onClick={handleCopyInvite}>
@@ -299,6 +341,35 @@ export function GroupDetailPage() {
             </div>
           </div>
         </div>
+
+        {myRole === 'master' && editingGroup && (
+          <div className="border border-gray-200 rounded-lg p-5 sm:p-8 mb-6">
+            <h2 className="text-lg font-semibold mb-4">그룹 정보 수정</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  그룹 이름
+                </label>
+                <Input
+                  value={groupTitle}
+                  onChange={(event) => setGroupTitle(event.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">설명</label>
+                <textarea
+                  value={groupDescription}
+                  onChange={(event) => setGroupDescription(event.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-md bg-white"
+                />
+              </div>
+              <Button onClick={handleUpdateGroup} disabled={updating}>
+                저장
+              </Button>
+            </div>
+          </div>
+        )}
 
         {canManageGroupMeetings && (
           <div className="border border-gray-200 rounded-lg p-5 sm:p-8 mb-6">
