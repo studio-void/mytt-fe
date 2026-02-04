@@ -54,6 +54,19 @@ const normalizeEventRange = (event: ScheduleEvent) => {
   return { start: eventStart, end: endExclusive, isAllDayLike };
 };
 
+const sortEventsByStartWithAllDayFirst = (items: ScheduleEvent[]) =>
+  [...items].sort((a, b) => {
+    const left = normalizeEventRange(a);
+    const right = normalizeEventRange(b);
+    if (left.isAllDayLike !== right.isAllDayLike) {
+      return left.isAllDayLike ? -1 : 1;
+    }
+    if (left.start.getTime() !== right.start.getTime()) {
+      return left.start.getTime() - right.start.getTime();
+    }
+    return left.end.getTime() - right.end.getTime();
+  });
+
 export function ViewSchedulePage() {
   const { uid, id } = useParams({ strict: false }) as {
     uid?: string;
@@ -129,10 +142,11 @@ export function ViewSchedulePage() {
   const getEventsForDate = (date: Date) => {
     const dayStart = startOfDay(date);
     const dayEnd = endOfDay(date);
-    return events.filter((event) => {
+    const filtered = events.filter((event) => {
       const { start, end } = normalizeEventRange(event);
       return start <= dayEnd && end >= dayStart;
     });
+    return sortEventsByStartWithAllDayFirst(filtered);
   };
 
   const today = new Date();
@@ -143,6 +157,7 @@ export function ViewSchedulePage() {
     () => getEventsForDate(sidebarDate),
     [events, sidebarDate],
   );
+  const isSidebarToday = isSameDay(sidebarDate, today);
   const dayEvents = useMemo(
     () => splitEventsForDate(getEventsForDate(currentDate), currentDate),
     [events, currentDate],
@@ -350,7 +365,7 @@ export function ViewSchedulePage() {
                             }}
                             title={event.title}
                           >
-                            {event.isAllDay
+                            {normalizeEventRange(event).isAllDayLike
                               ? (event.title ?? '바쁜 시간')
                               : `${new Date(event.startTime).toLocaleTimeString(
                                   'ko-KR',
@@ -396,7 +411,7 @@ export function ViewSchedulePage() {
                                   }}
                                 />
                                 <span className="flex-1 truncate">
-                                  {event.isAllDay
+                                  {normalizeEventRange(event).isAllDayLike
                                     ? (event.title ?? '바쁜 시간')
                                     : `${new Date(
                                         event.startTime,
@@ -682,7 +697,12 @@ export function ViewSchedulePage() {
                 sidebarEvents.slice(0, 10).map((event) => (
                   <div
                     key={event.id}
-                    className="p-3 border border-gray-200 rounded-md"
+                    className={`p-3 border border-gray-200 rounded-md ${
+                      isSidebarToday &&
+                      normalizeEventRange(event).end.getTime() < now.getTime()
+                        ? 'bg-gray-50'
+                        : 'bg-white'
+                    }`}
                   >
                     <div className="flex items-start gap-2">
                       <div
@@ -696,7 +716,7 @@ export function ViewSchedulePage() {
                           {event.title}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
-                          {event.isAllDay
+                          {normalizeEventRange(event).isAllDayLike
                             ? '하루 종일'
                             : new Date(event.startTime).toLocaleTimeString(
                                 'ko-KR',
@@ -913,7 +933,7 @@ const layoutTimedEvents = (events: ScheduleEvent[], date: Date) => {
 };
 
 const formatEventTimeLabel = (event: ScheduleEvent, date: Date) => {
-  if (event.isAllDay) return '하루 종일';
+  if (normalizeEventRange(event).isAllDayLike) return '하루 종일';
   const dayStart = startOfDay(date);
   const dayEnd = endOfDay(date);
   const start = new Date(event.startTime);
