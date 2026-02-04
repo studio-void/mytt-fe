@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 
 import { useNavigate } from '@tanstack/react-router';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, Copy, Plus } from 'lucide-react';
+import { Check, Copy, Crown, Plus, User, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Layout } from '@/components';
 import { Button } from '@/components/ui/button';
+import { type GroupRole, groupApi } from '@/services/api/groupApi';
 import { meetingApi } from '@/services/api/meetingApi';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -29,6 +30,9 @@ export function MeetingListPage() {
   const [meetings, setMeetings] = useState<MeetingSummary[]>([]);
   const [joinedMeetings, setJoinedMeetings] = useState<MeetingSummary[]>([]);
   const [copiedInviteCode, setCopiedInviteCode] = useState<string | null>(null);
+  const [groupRoleMap, setGroupRoleMap] = useState<
+    Record<string, { title: string; role: GroupRole }>
+  >({});
 
   useEffect(() => {
     if (!isAuthReady) return;
@@ -42,12 +46,19 @@ export function MeetingListPage() {
   const loadMeetings = async () => {
     try {
       setLoading(true);
-      const [hostedResponse, joinedResponse] = await Promise.all([
-        meetingApi.getMyMeetings(),
-        meetingApi.getJoinedMeetings(),
-      ]);
+      const [hostedResponse, joinedResponse, groupsResponse] =
+        await Promise.all([
+          meetingApi.getMyMeetings(),
+          meetingApi.getJoinedMeetings(),
+          groupApi.getMyGroups(),
+        ]);
       setMeetings(hostedResponse.data ?? []);
       setJoinedMeetings(joinedResponse.data ?? []);
+      const map: Record<string, { title: string; role: GroupRole }> = {};
+      (groupsResponse.data ?? []).forEach((group) => {
+        map[group.id] = { title: group.title, role: group.role };
+      });
+      setGroupRoleMap(map);
     } catch (error) {
       console.error('Error loading meetings:', error);
       toast.error('약속 목록을 불러오는데 실패했습니다.');
@@ -67,6 +78,38 @@ export function MeetingListPage() {
     });
 
   const isPastMeeting = (endTime: string) => new Date(endTime) < new Date();
+
+  const roleBadge = (role?: GroupRole) => {
+    if (role === 'master') {
+      return <Crown className="h-3.5 w-3.5 text-amber-500" />;
+    }
+    if (role === 'manager') {
+      return <Crown className="h-3.5 w-3.5 text-gray-400" />;
+    }
+    return <User className="h-3.5 w-3.5 text-gray-400" />;
+  };
+
+  const GroupBadgeButton = ({ meeting }: { meeting: MeetingSummary }) => {
+    if (!meeting.groupId) return null;
+    const meta = groupRoleMap[meeting.groupId];
+    if (!meta) return null;
+    return (
+      <button
+        type="button"
+        onClick={() => navigate({ to: `/group/${meeting.groupId}` })}
+        className="group relative inline-flex h-6 w-6 items-center justify-center rounded text-gray-500 hover:text-gray-700 hover:border-gray-400"
+        aria-label="그룹 이동"
+      >
+        <Users className="h-4 w-4" />
+        <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[10px] text-white opacity-0 shadow-md transition-opacity group-hover:opacity-100">
+          <span className="inline-flex items-center gap-1">
+            {roleBadge(meta.role)}
+            {meta.title}
+          </span>
+        </span>
+      </button>
+    );
+  };
 
   const handleCopyInviteLink = (inviteCode: string) => {
     const link = `${window.location.origin}/meeting/${inviteCode}`;
@@ -138,18 +181,16 @@ export function MeetingListPage() {
                           : 'bg-white'
                       }`}
                     >
-                      <h2 className="text-lg font-semibold mb-2">
-                        {meeting.title}
-                      </h2>
+                      <div className="mb-2 flex items-center gap-2">
+                        <h2 className="text-lg font-semibold">
+                          {meeting.title}
+                        </h2>
+                        <GroupBadgeButton meeting={meeting} />
+                      </div>
                       <p className="text-sm text-gray-600">
                         {formatDateTime(meeting.startTime)} -{' '}
                         {formatDateTime(meeting.endTime)}
                       </p>
-                      {meeting.groupTitle && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          그룹: {meeting.groupTitle}
-                        </p>
-                      )}
                       {meeting.timezone && (
                         <p className="text-xs text-gray-400 mt-1">
                           시간대: {meeting.timezone}
@@ -232,9 +273,12 @@ export function MeetingListPage() {
                           : 'bg-white'
                       }`}
                     >
-                      <h2 className="text-lg font-semibold mb-2">
-                        {meeting.title}
-                      </h2>
+                      <div className="mb-2 flex items-center gap-2">
+                        <h2 className="text-lg font-semibold">
+                          {meeting.title}
+                        </h2>
+                        <GroupBadgeButton meeting={meeting} />
+                      </div>
                       <p className="text-sm text-gray-600">
                         {formatDateTime(meeting.startTime)} -{' '}
                         {formatDateTime(meeting.endTime)}
