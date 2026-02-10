@@ -697,6 +697,17 @@ export const meetingApi = {
     if (!meeting) {
       throw new Error('약속을 찾을 수 없습니다.');
     }
+    if (!auth.currentUser) {
+      return {
+        data: {
+          meeting: meetingToClient(meeting),
+          participants: [],
+          availabilityDocs: [],
+          availabilitySlots: [],
+          myAvailability: null,
+        },
+      };
+    }
     const participantsRef = collection(
       db,
       'meetings',
