@@ -869,4 +869,54 @@ export const meetingApi = {
     }
     return { data: snapshot.data() as AvailabilityDoc };
   },
+
+  refreshMyMeetingAvailabilityForRange: async (
+    rangeStart: Date,
+    rangeEnd: Date,
+  ) => {
+    const user = ensureUser();
+    const participantsSnap = await getDocs(
+      query(collectionGroup(db, 'participants'), where('uid', '==', user.uid)),
+    );
+
+    const meetingIds = Array.from(
+      new Set(
+        participantsSnap.docs
+          .map((docSnap) => docSnap.ref.parent.parent?.id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+
+    const meetingDocs = await Promise.all(
+      meetingIds.map((meetingId) => getDoc(doc(db, 'meetings', meetingId))),
+    );
+
+    const meetings = meetingDocs
+      .filter((docSnap) => docSnap.exists())
+      .map((docSnap) => ({
+        id: docSnap.id,
+        ...(docSnap.data() as MeetingDoc),
+      }))
+      .filter((meeting) => {
+        const start = meeting.startTime.toDate();
+        const end = meeting.endTime.toDate();
+        return start <= rangeEnd && end >= rangeStart;
+      });
+
+    for (const meeting of meetings) {
+      const manualBlocks = await getExistingManualBlocks(
+        meeting.id,
+        user.uid,
+      );
+      await upsertAvailability(
+        meeting.id,
+        user.uid,
+        meeting.startTime.toDate(),
+        meeting.endTime.toDate(),
+        manualBlocks,
+      );
+    }
+
+    return { data: { refreshed: meetings.length } };
+  },
 };

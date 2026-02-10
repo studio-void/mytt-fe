@@ -21,6 +21,8 @@ import {
   readBucketEvents,
   writeEventBuckets,
 } from './eventBuckets';
+import { meetingApi } from './meetingApi';
+import { sharingApi } from './sharingApi';
 
 const GOOGLE_CALENDAR_BASE = 'https://www.googleapis.com/calendar/v3';
 const DEFAULT_RANGE_MONTHS = 2;
@@ -383,10 +385,39 @@ export const calendarApi = {
         { merge: true },
       );
 
+      let shareLinksRefreshed = false;
+      let shareLinksRefreshError: string | undefined;
+      let meetingAvailabilityRefreshed = false;
+      let meetingAvailabilityRefreshError: string | undefined;
+      try {
+        await sharingApi.refreshShareLinksForOwner();
+        shareLinksRefreshed = true;
+      } catch (error) {
+        shareLinksRefreshError =
+          error instanceof Error ? error.message : '공유 링크 갱신 실패';
+        console.warn('Share link refresh failed:', error);
+      }
+      try {
+        await meetingApi.refreshMyMeetingAvailabilityForRange(start, end);
+        meetingAvailabilityRefreshed = true;
+      } catch (error) {
+        meetingAvailabilityRefreshError =
+          error instanceof Error ? error.message : '미팅 가용성 갱신 실패';
+        console.warn('Meeting availability refresh failed:', error);
+      }
+
       return {
         data: {
           calendars,
           eventsCount: events.length,
+          shareLinksRefreshed,
+          ...(shareLinksRefreshError
+            ? { shareLinksRefreshError }
+            : {}),
+          meetingAvailabilityRefreshed,
+          ...(meetingAvailabilityRefreshError
+            ? { meetingAvailabilityRefreshError }
+            : {}),
         },
       };
     } catch (error) {

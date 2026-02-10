@@ -223,7 +223,9 @@ export function CalendarPage() {
         if (syncResponse.error) {
           throw new Error(syncResponse.error);
         }
-        nextCalendars = syncResponse.data?.calendars ?? [];
+        if (syncResponse.data && 'calendars' in syncResponse.data) {
+          nextCalendars = syncResponse.data.calendars ?? [];
+        }
       }
       const sorted = [...nextCalendars].sort((a, b) => {
         if (a.isPrimary === b.isPrimary) {
@@ -273,7 +275,15 @@ export function CalendarPage() {
       if (response.data?.skipped) {
         toast.message('동기화가 너무 빈번해 잠시 건너뛰었습니다.');
       } else {
-        toast.success('캘린더가 동기화되었습니다.');
+        if (
+          response.data &&
+          'shareLinksRefreshed' in response.data &&
+          response.data.shareLinksRefreshed
+        ) {
+          toast.success('캘린더가 동기화되었습니다. 공유 링크도 업데이트되었습니다.');
+        } else {
+          toast.success('캘린더가 동기화되었습니다.');
+        }
       }
 
       // 동기화 후 캘린더와 이벤트 다시 로드

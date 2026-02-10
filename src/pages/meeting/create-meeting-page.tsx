@@ -132,7 +132,15 @@ export function CreateMeetingPage() {
       if (response.data?.skipped) {
         toast.message('동기화가 너무 빈번해 잠시 건너뛰었습니다.');
       } else {
-        toast.success('캘린더가 동기화되었습니다.');
+        if (
+          response.data &&
+          'shareLinksRefreshed' in response.data &&
+          response.data.shareLinksRefreshed
+        ) {
+          toast.success('캘린더가 동기화되었습니다. 공유 링크도 업데이트되었습니다.');
+        } else {
+          toast.success('캘린더가 동기화되었습니다.');
+        }
       }
     } catch (error) {
       console.error('Error syncing calendar:', error);
