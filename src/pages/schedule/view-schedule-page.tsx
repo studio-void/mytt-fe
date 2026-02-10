@@ -48,9 +48,10 @@ const normalizeEventRange = (event: ScheduleEvent) => {
   const isAllDayLike =
     event.isAllDay ||
     (startsAtMidnight && endsAtMidnight && durationMs >= 86_400_000);
-  const endExclusive = isAllDayLike
-    ? new Date(eventEnd.getTime() - 1)
-    : eventEnd;
+  const endExclusive =
+    eventEnd.getTime() > eventStart.getTime()
+      ? new Date(eventEnd.getTime() - 1)
+      : eventEnd;
   return { start: eventStart, end: endExclusive, isAllDayLike };
 };
 
