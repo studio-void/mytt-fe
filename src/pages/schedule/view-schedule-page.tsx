@@ -150,6 +150,16 @@ export function ViewSchedulePage() {
     return sortEventsByStartWithAllDayFirst(filtered);
   };
 
+  const shouldShowCalendarTitle = (event: ScheduleEvent) =>
+    privacyLevel !== 'busy_only' && Boolean(event.calendarTitle);
+
+  const getDisplayEventColor = (event: ScheduleEvent) => {
+    if (privacyLevel !== 'full_details') {
+      return '#9ca3af';
+    }
+    return getEventColor(event);
+  };
+
   const today = new Date();
   const monthDays = useMemo(() => buildMonthDays(currentDate), [currentDate]);
   const weekDays = useMemo(() => buildWeekDays(currentDate), [currentDate]);
@@ -362,7 +372,7 @@ export function ViewSchedulePage() {
                             key={event.id}
                             className="text-[11px] sm:text-xs px-2 py-1 rounded-md truncate text-white shadow-sm"
                             style={{
-                              backgroundColor: getEventColor(event),
+                              backgroundColor: getDisplayEventColor(event),
                             }}
                             title={event.title}
                           >
@@ -372,7 +382,7 @@ export function ViewSchedulePage() {
                                   'ko-KR',
                                   { hour: '2-digit', minute: '2-digit' },
                                 )} ${event.title ?? '바쁜 시간'}`}
-                            {event.calendarTitle && (
+                            {shouldShowCalendarTitle(event) && (
                               <span className="opacity-90">
                                 {' '}
                                 · {event.calendarTitle}
@@ -408,7 +418,7 @@ export function ViewSchedulePage() {
                                 <span
                                   className="h-2 w-2 rounded-full"
                                   style={{
-                                    backgroundColor: getEventColor(event),
+                                    backgroundColor: getDisplayEventColor(event),
                                   }}
                                 />
                                 <span className="flex-1 truncate">
@@ -481,7 +491,7 @@ export function ViewSchedulePage() {
                                   key={event.id}
                                   className="text-[11px] px-2 py-1 rounded-full text-white"
                                   style={{
-                                    backgroundColor: getEventColor(event),
+                                    backgroundColor: getDisplayEventColor(event),
                                   }}
                                   title={event.title}
                                 >
@@ -553,7 +563,7 @@ export function ViewSchedulePage() {
                                   height,
                                   left,
                                   width,
-                                  backgroundColor: getEventColor(event),
+                                  backgroundColor: getDisplayEventColor(event),
                                 }}
                                 title={event.title}
                               >
@@ -563,7 +573,7 @@ export function ViewSchedulePage() {
                                 <div className="text-[10px] opacity-90">
                                   {formatEventTimeLabel(event, date)}
                                 </div>
-                                {event.calendarTitle && (
+                                {shouldShowCalendarTitle(event) && (
                                   <div className="text-[10px] opacity-80 truncate">
                                     {event.calendarTitle}
                                   </div>
@@ -596,7 +606,7 @@ export function ViewSchedulePage() {
                               key={event.id}
                               className="text-xs px-2 py-1 rounded-full text-white"
                               style={{
-                                backgroundColor: getEventColor(event),
+                                backgroundColor: getDisplayEventColor(event),
                               }}
                             >
                               {event.title}
@@ -655,7 +665,7 @@ export function ViewSchedulePage() {
                               height,
                               left,
                               width,
-                              backgroundColor: getEventColor(event),
+                              backgroundColor: getDisplayEventColor(event),
                             }}
                             title={event.title}
                           >
@@ -665,7 +675,7 @@ export function ViewSchedulePage() {
                             <div className="text-[11px] opacity-90">
                               {formatEventTimeLabel(event, currentDate)}
                             </div>
-                            {event.calendarTitle && (
+                            {shouldShowCalendarTitle(event) && (
                               <div className="text-[10px] opacity-80 truncate">
                                 {event.calendarTitle}
                               </div>
@@ -709,12 +719,12 @@ export function ViewSchedulePage() {
                       <div
                         className="w-2 h-2 mt-1.5 rounded-full flex-shrink-0"
                         style={{
-                          backgroundColor: getEventColor(event),
+                          backgroundColor: getDisplayEventColor(event),
                         }}
                       />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm truncate">
-                          {event.title}
+                          {event.title ?? '바쁜 시간'}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
                           {normalizeEventRange(event).isAllDayLike
@@ -727,7 +737,7 @@ export function ViewSchedulePage() {
                                 },
                               )}
                         </p>
-                        {event.calendarTitle && (
+                        {shouldShowCalendarTitle(event) && (
                           <p className="text-xs text-gray-400 mt-0.5">
                             {event.calendarTitle}
                           </p>

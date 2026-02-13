@@ -156,11 +156,10 @@ const mapEventForPrivacy = (
   if (privacyLevel === 'busy_only') {
     return {
       id: event.id,
+      title: '바쁜 시간',
       startTime: event.startTime.toDate().toISOString(),
       endTime: event.endTime.toDate().toISOString(),
       isBusy: true,
-      calendarTitle: event.calendarTitle,
-      calendarColor: event.calendarColor,
     };
   }
 
@@ -172,7 +171,6 @@ const mapEventForPrivacy = (
       endTime: event.endTime.toDate().toISOString(),
       isBusy: event.isBusy,
       calendarTitle: event.calendarTitle,
-      calendarColor: event.calendarColor,
     };
   }
 
