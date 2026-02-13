@@ -2,6 +2,7 @@ import { addMonths } from 'date-fns';
 import {
   Timestamp,
   collection,
+  collectionGroup,
   deleteDoc,
   doc,
   getDoc,
@@ -10,6 +11,7 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  where,
   writeBatch,
 } from 'firebase/firestore';
 
@@ -78,6 +80,11 @@ export interface StoredEvent {
   isBusy: boolean;
   calendarTitle?: string;
   calendarColor?: string;
+}
+
+interface TimeBlock {
+  startTime: string;
+  endTime: string;
 }
 
 const getRange = (startDate?: Date, endDate?: Date) => {
@@ -243,6 +250,59 @@ const mapEvent = (
   };
 };
 
+const buildBusyBlocksFromEvents = (
+  events: StoredEvent[],
+  start: Date,
+  end: Date,
+) =>
+  events
+    .filter(
+      (event) =>
+        event.isBusy && event.endTime.getTime() > start.getTime() &&
+        event.startTime.getTime() < end.getTime(),
+    )
+    .map((event) => ({
+      startTime: event.startTime.toISOString(),
+      endTime: event.endTime.toISOString(),
+    })) satisfies TimeBlock[];
+
+const refreshGroupAvailabilityCache = async (
+  uid: string,
+  start: Date,
+  end: Date,
+  busyBlocks: TimeBlock[],
+) => {
+  const memberships = await getDocs(
+    query(collectionGroup(db, 'members'), where('uid', '==', uid)),
+  );
+  const groupIds = Array.from(
+    new Set(
+      memberships.docs
+        .map((docSnap) => docSnap.ref.parent.parent?.id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
+  if (groupIds.length === 0) {
+    return 0;
+  }
+  await Promise.all(
+    groupIds.map((groupId) =>
+      setDoc(
+        doc(db, 'groups', groupId, 'availability', uid),
+        {
+          uid,
+          busyBlocks,
+          rangeStart: start.toISOString(),
+          rangeEnd: end.toISOString(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      ),
+    ),
+  );
+  return groupIds.length;
+};
+
 const fetchAllEvents = async (
   calendarId: string,
   token: string,
@@ -385,6 +445,25 @@ export const calendarApi = {
         { merge: true },
       );
 
+      let groupAvailabilityRefreshed = false;
+      let groupAvailabilityRefreshError: string | undefined;
+      try {
+        const busyBlocks = buildBusyBlocksFromEvents(events, start, end);
+        await refreshGroupAvailabilityCache(
+          auth.currentUser.uid,
+          start,
+          end,
+          busyBlocks,
+        );
+        groupAvailabilityRefreshed = true;
+      } catch (error) {
+        groupAvailabilityRefreshError =
+          error instanceof Error
+            ? error.message
+            : '그룹 가용성 캐시 갱신 실패';
+        console.warn('Group availability cache refresh failed:', error);
+      }
+
       let shareLinksRefreshed = false;
       let shareLinksRefreshError: string | undefined;
       let meetingAvailabilityRefreshed = false;
@@ -410,6 +489,10 @@ export const calendarApi = {
         data: {
           calendars,
           eventsCount: events.length,
+          groupAvailabilityRefreshed,
+          ...(groupAvailabilityRefreshError
+            ? { groupAvailabilityRefreshError }
+            : {}),
           shareLinksRefreshed,
           ...(shareLinksRefreshError
             ? { shareLinksRefreshError }

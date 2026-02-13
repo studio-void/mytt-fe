@@ -65,6 +65,14 @@ interface TimeBlock {
   endTime: string;
 }
 
+interface GroupAvailabilityDoc {
+  uid: string;
+  busyBlocks: TimeBlock[];
+  rangeStart?: string;
+  rangeEnd?: string;
+  updatedAt?: Timestamp;
+}
+
 interface AvailabilitySlot {
   startTime: string;
   endTime: string;
@@ -302,6 +310,31 @@ const getGroupMembers = async (groupId: string) => {
   return snapshot.docs.map((docSnap) => docSnap.data() as GroupMemberDoc);
 };
 
+const syncAvailabilityFromGroupCache = async (
+  meetingId: string,
+  groupId: string,
+  userId: string,
+) => {
+  const snapshot = await getDoc(doc(db, 'groups', groupId, 'availability', userId));
+  if (!snapshot.exists()) {
+    return false;
+  }
+  const cached = snapshot.data() as GroupAvailabilityDoc;
+  const manualBlocks = await getExistingManualBlocks(meetingId, userId);
+  const mergedBusyBlocks = [...(cached.busyBlocks ?? []), ...manualBlocks];
+  await setDoc(
+    doc(db, 'meetings', meetingId, 'availability', userId),
+    {
+      uid: userId,
+      busyBlocks: mergedBusyBlocks,
+      manualBlocks,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+  return true;
+};
+
 const upsertAvailability = async (
   meetingId: string,
   userId: string,
@@ -478,6 +511,12 @@ export const meetingApi = {
             nickname: member.nickname,
             photoURL: member.photoURL,
           });
+          const syncedFromGroupCache = await syncAvailabilityFromGroupCache(
+            meetingRef.id,
+            data.groupId!,
+            member.uid,
+          );
+          if (syncedFromGroupCache) return;
           await seedAvailability(meetingRef.id, member.uid);
         }),
       );
