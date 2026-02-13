@@ -1,4 +1,4 @@
-import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useNavigate, useParams } from '@tanstack/react-router';
 import { motion } from 'framer-motion';
@@ -70,6 +70,9 @@ export function MeetingJoinPage() {
   const [blockedSlots, setBlockedSlots] = useState<Set<string>>(new Set());
   const [isDragging, setIsDragging] = useState(false);
   const [dragMode, setDragMode] = useState<'add' | 'remove'>('add');
+  const dragCellRef = useRef<{ dayIndex: number; slotIndex: number } | null>(
+    null,
+  );
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [hoveredAvailability, setHoveredAvailability] = useState<{
     slot: TimeSlot;
@@ -94,10 +97,6 @@ export function MeetingJoinPage() {
     x: number;
     y: number;
   } | null>(null);
-  const hasOtherParticipants = useMemo(() => {
-    if (!participants || participants.length === 0) return false;
-    return participants.some((participant) => participant.uid !== user?.uid);
-  }, [participants, user?.uid]);
 
   useEffect(() => {
     if (!inviteCode) {
@@ -118,7 +117,10 @@ export function MeetingJoinPage() {
   }, [meeting]);
 
   useEffect(() => {
-    const stopDragging = () => setIsDragging(false);
+    const stopDragging = () => {
+      setIsDragging(false);
+      dragCellRef.current = null;
+    };
     window.addEventListener('pointerup', stopDragging);
     return () => window.removeEventListener('pointerup', stopDragging);
   }, []);
@@ -473,16 +475,54 @@ export function MeetingJoinPage() {
     return map;
   }, [calendarEvents, meetingRange]);
 
-  const handleToggleSlot = (slotId: string, action: 'add' | 'remove') => {
+  const handleToggleSlots = (slotIds: string[], action: 'add' | 'remove') => {
+    if (slotIds.length === 0) return;
     setBlockedSlots((prev) => {
       const next = new Set(prev);
-      if (action === 'add') {
-        next.add(slotId);
-      } else {
-        next.delete(slotId);
-      }
+      slotIds.forEach((slotId) => {
+        if (action === 'add') {
+          next.add(slotId);
+        } else {
+          next.delete(slotId);
+        }
+      });
       return next;
     });
+  };
+
+  const handleDragAcrossSlots = (
+    startCell: { dayIndex: number; slotIndex: number },
+    endCell: { dayIndex: number; slotIndex: number },
+    action: 'add' | 'remove',
+  ) => {
+    if (!meetingRange || weekDays.length === 0) return;
+
+    const dayDelta = endCell.dayIndex - startCell.dayIndex;
+    const slotDelta = endCell.slotIndex - startCell.slotIndex;
+    const steps = Math.max(Math.abs(dayDelta), Math.abs(slotDelta));
+    const slotIds = new Set<string>();
+
+    for (let step = 0; step <= steps; step += 1) {
+      const ratio = steps === 0 ? 0 : step / steps;
+      const dayIndex = Math.round(startCell.dayIndex + dayDelta * ratio);
+      const slotIndex = Math.round(startCell.slotIndex + slotDelta * ratio);
+      if (dayIndex < 0 || dayIndex >= weekDays.length) continue;
+      if (slotIndex < 0 || slotIndex >= TIME_SLOTS.length) continue;
+
+      const slotStart = addMinutes(weekDays[dayIndex], TIME_SLOTS[slotIndex]);
+      const slotEnd = addMinutes(slotStart, SLOT_MINUTES);
+      const inRange =
+        slotStart >= meetingRange.start && slotEnd <= meetingRange.end;
+      if (!inRange) continue;
+      slotIds.add(slotStart.toISOString());
+    }
+
+    handleToggleSlots(Array.from(slotIds), action);
+  };
+
+  const handleStopDragging = () => {
+    setIsDragging(false);
+    dragCellRef.current = null;
   };
 
   const handleRecommendTime = () => {
@@ -675,20 +715,11 @@ export function MeetingJoinPage() {
                 </Button>
               )}
               {isAuthenticated && user?.uid === meeting.hostUid && (
-                <div className="relative group">
-                  <Button
-                    variant="destructive"
-                    onClick={handleDeleteMeeting}
-                    disabled={hasOtherParticipants}
-                  >
+                <div>
+                  <Button variant="destructive" onClick={handleDeleteMeeting}>
                     <Trash />
                     약속 삭제
                   </Button>
-                  {hasOtherParticipants && (
-                    <div className="pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow-md transition-opacity group-hover:opacity-100">
-                      다른 참가자가 있어 삭제할 수 없습니다.
-                    </div>
-                  )}
                 </div>
               )}
               {hasJoined &&
@@ -1158,7 +1189,7 @@ export function MeetingJoinPage() {
 
                     <div
                       className="grid grid-cols-[64px_repeat(7,1fr)]"
-                      onPointerUp={() => setIsDragging(false)}
+                      onPointerUp={handleStopDragging}
                     >
                       <div>
                         {HOUR_LABELS.map((label, index) => (
@@ -1171,14 +1202,14 @@ export function MeetingJoinPage() {
                           </div>
                         ))}
                       </div>
-                      {weekDays.map((day) => {
+                      {weekDays.map((day, dayIndex) => {
                         const dayKey = day.toISOString();
                         return (
                           <div
                             key={dayKey}
                             className="border-l border-gray-100"
                           >
-                            {TIME_SLOTS.map((slotMinutes) => {
+                            {TIME_SLOTS.map((slotMinutes, slotIndex) => {
                               const slotStart = addMinutes(day, slotMinutes);
                               const slotEnd = addMinutes(slotStart, 15);
                               const inRange =
@@ -1219,11 +1250,35 @@ export function MeetingJoinPage() {
                                       : 'add';
                                     setDragMode(nextMode);
                                     setIsDragging(true);
-                                    handleToggleSlot(slotId, nextMode);
+                                    const currentCell = {
+                                      dayIndex,
+                                      slotIndex,
+                                    };
+                                    dragCellRef.current = currentCell;
+                                    handleDragAcrossSlots(
+                                      currentCell,
+                                      currentCell,
+                                      nextMode,
+                                    );
                                   }}
                                   onPointerEnter={() => {
                                     if (!isDragging || !inRange) return;
-                                    handleToggleSlot(slotId, dragMode);
+                                    const currentCell = { dayIndex, slotIndex };
+                                    if (!dragCellRef.current) {
+                                      dragCellRef.current = currentCell;
+                                      handleDragAcrossSlots(
+                                        currentCell,
+                                        currentCell,
+                                        dragMode,
+                                      );
+                                      return;
+                                    }
+                                    handleDragAcrossSlots(
+                                      dragCellRef.current,
+                                      currentCell,
+                                      dragMode,
+                                    );
+                                    dragCellRef.current = currentCell;
                                   }}
                                   onMouseEnter={(event) => {
                                     if (isDragging || !slotEvent) return;
