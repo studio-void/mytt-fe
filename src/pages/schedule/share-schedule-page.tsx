@@ -258,10 +258,16 @@ export function ShareSchedulePage() {
                 onChange={(e) => setLinkId(e.target.value)}
                 disabled={!!editingLinkId}
                 placeholder="예: team-weekly (비워두면 자동 생성)"
-                className="w-full px-3 py-2 border border-gray-200 rounded-md"
+                className={`w-full px-3 py-2 rounded-md transition-colors ${
+                  editingLinkId
+                    ? 'border border-dashed border-gray-300 bg-gray-100 text-gray-500 cursor-not-allowed'
+                    : 'border border-gray-200 bg-white text-gray-900'
+                }`}
               />
               <p className="text-xs text-gray-500 mt-1">
-                3~32자, 영문/숫자/-/_ 사용 가능
+                {editingLinkId
+                  ? '수정 모드에서는 링크 ID를 변경할 수 없습니다.'
+                  : '3~32자, 영문/숫자/-/_ 사용 가능'}
               </p>
             </div>
 

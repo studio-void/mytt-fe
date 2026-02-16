@@ -48,7 +48,10 @@ type UserProfileDoc = {
 const buildProvider = () => {
   const provider = new GoogleAuthProvider();
   calendarScopes.forEach((scope) => provider.addScope(scope));
-  provider.setCustomParameters({ prompt: 'consent', access_type: 'online' });
+  provider.setCustomParameters({
+    prompt: 'select_account',
+    include_granted_scopes: 'true',
+  });
   return provider;
 };
 
@@ -215,14 +218,6 @@ const updateStoreUser = async (user: User) => {
   }
 };
 
-const isIOSDevice = () => {
-  if (typeof navigator === 'undefined') return false;
-  const ua = navigator.userAgent.toLowerCase();
-  const isIOS = /iphone|ipad|ipod/.test(ua);
-  const isIPadOS = /macintosh/.test(ua) && 'ontouchend' in window;
-  return isIOS || isIPadOS;
-};
-
 const isStandalonePwa = () => {
   if (typeof window === 'undefined') return false;
   const standaloneMatch =
@@ -237,18 +232,11 @@ const isStandalonePwa = () => {
 const shouldUseRedirect = () => isStandalonePwa();
 
 const setBestPersistence = async () => {
-  const candidates =
-    isStandalonePwa() && isIOSDevice()
-      ? [
-          browserLocalPersistence,
-          indexedDBLocalPersistence,
-          browserSessionPersistence,
-        ]
-      : [
-          indexedDBLocalPersistence,
-          browserLocalPersistence,
-          browserSessionPersistence,
-        ];
+  const candidates = [
+    browserLocalPersistence,
+    indexedDBLocalPersistence,
+    browserSessionPersistence,
+  ];
 
   for (const persistence of candidates) {
     try {

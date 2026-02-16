@@ -15,7 +15,10 @@ import { toast } from 'sonner';
 import { Layout } from '@/components';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { calendarApi } from '@/services/api/calendarApi';
+import {
+  type TimetableRecurringEvent,
+  calendarApi,
+} from '@/services/api/calendarApi';
 import { useAuthStore } from '@/store/useAuthStore';
 
 interface CalendarEvent {
@@ -400,52 +403,36 @@ weekday는 ISO 기준 숫자(월=1 ... 일=7)로만 출력해.
     return (events ?? []).filter(Boolean);
   };
 
-  const buildRepeatingEvents = (
-    extracted: ExtractedScheduleEvent[],
-    startDate: Date,
-    endDate: Date,
-  ) => {
-    const results: Array<{
-      title: string;
-      location?: string;
-      startTime: Date;
-      endTime: Date;
-    }> = [];
-    const cursor = new Date(
-      startDate.getFullYear(),
-      startDate.getMonth(),
-      startDate.getDate(),
-    );
-    const last = new Date(
-      endDate.getFullYear(),
-      endDate.getMonth(),
-      endDate.getDate(),
-    );
-    while (cursor <= last) {
-      const weekday = cursor.getDay() === 0 ? 7 : cursor.getDay();
-      extracted.forEach((event) => {
-        const eventWeekday = weekdayToNumber(event.weekday);
-        if (eventWeekday !== weekday) return;
-        const start = parseTime(event.startTime);
-        const end = parseTime(event.endTime);
-        if (!start || !end) return;
-        const startDateTime = new Date(cursor);
-        startDateTime.setHours(start.hour, start.minute, 0, 0);
-        const endDateTime = new Date(cursor);
-        endDateTime.setHours(end.hour, end.minute, 0, 0);
-        if (endDateTime <= startDateTime) {
-          endDateTime.setDate(endDateTime.getDate() + 1);
-        }
-        results.push({
-          title: event.title,
-          location: event.location,
-          startTime: startDateTime,
-          endTime: endDateTime,
-        });
+  const buildRecurringEvents = (extracted: ExtractedScheduleEvent[]) => {
+    const unique = new Map<string, TimetableRecurringEvent>();
+    extracted.forEach((event) => {
+      const weekday = weekdayToNumber(event.weekday);
+      if (!Number.isInteger(weekday) || weekday < 1 || weekday > 7) return;
+      const start = parseTime(event.startTime);
+      const end = parseTime(event.endTime);
+      if (!start || !end) return;
+      const startTime = `${String(start.hour).padStart(2, '0')}:${String(
+        start.minute,
+      ).padStart(2, '0')}`;
+      const endTime = `${String(end.hour).padStart(2, '0')}:${String(
+        end.minute,
+      ).padStart(2, '0')}`;
+      const key = [
+        event.title.trim(),
+        event.location?.trim() ?? '',
+        String(weekday),
+        startTime,
+        endTime,
+      ].join('|');
+      unique.set(key, {
+        title: event.title.trim(),
+        location: event.location?.trim() || undefined,
+        weekday,
+        startTime,
+        endTime,
       });
-      cursor.setDate(cursor.getDate() + 1);
-    }
-    return results;
+    });
+    return Array.from(unique.values());
   };
 
   const handleAnalyzeAndSave = async () => {
@@ -478,12 +465,15 @@ weekday는 ISO 기준 숫자(월=1 ... 일=7)로만 출력해.
         toast.error('일정을 추출하지 못했습니다.');
         return;
       }
-      const generated = buildRepeatingEvents(extracted, start, end);
+      const generated = buildRecurringEvents(extracted);
       if (generated.length === 0) {
         toast.error('반복 일정이 생성되지 않았습니다.');
         return;
       }
-      const response = await calendarApi.createTimetableEvents(generated);
+      const response = await calendarApi.createTimetableEvents(generated, {
+        startDate: start,
+        endDate: end,
+      });
       if (response.error) {
         toast.error(response.error);
         return;

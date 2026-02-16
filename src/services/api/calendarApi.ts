@@ -87,6 +87,55 @@ interface TimeBlock {
   endTime: string;
 }
 
+export interface TimetableRecurringEvent {
+  title: string;
+  location?: string;
+  weekday: number;
+  startTime: string;
+  endTime: string;
+}
+
+const parseHourMinute = (value: string) => {
+  const [hourPart, minutePart] = value.split(':');
+  const hour = Number(hourPart);
+  const minute = Number(minutePart ?? '0');
+  if (
+    Number.isNaN(hour) ||
+    Number.isNaN(minute) ||
+    hour < 0 ||
+    hour > 23 ||
+    minute < 0 ||
+    minute > 59
+  ) {
+    return null;
+  }
+  return { hour, minute };
+};
+
+const isoWeekdayToRrule = (weekday: number) => {
+  const byDay = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'][weekday - 1];
+  return byDay ?? null;
+};
+
+const getFirstOccurrenceDate = (startDate: Date, weekday: number) => {
+  const base = new Date(
+    startDate.getFullYear(),
+    startDate.getMonth(),
+    startDate.getDate(),
+    0,
+    0,
+    0,
+    0,
+  );
+  const currentIsoWeekday = base.getDay() === 0 ? 7 : base.getDay();
+  const offset = (weekday - currentIsoWeekday + 7) % 7;
+  base.setDate(base.getDate() + offset);
+  return base;
+};
+
+const toRruleUntilUtc = (date: Date) =>
+  date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+
 const getRange = (startDate?: Date, endDate?: Date) => {
   const start = startDate ?? addMonths(new Date(), -DEFAULT_RANGE_MONTHS);
   const end = endDate ?? addMonths(new Date(), DEFAULT_RANGE_MONTHS);
@@ -512,15 +561,14 @@ export const calendarApi = {
   },
 
   createTimetableEvents: async (
-    events: Array<{
-      title: string;
-      location?: string;
-      startTime: Date;
-      endTime: Date;
-    }>,
+    events: TimetableRecurringEvent[],
+    options: { startDate: Date; endDate: Date },
   ) => {
     if (!auth.currentUser) {
       return { error: '로그인이 필요합니다.' };
+    }
+    if (options.endDate < options.startDate) {
+      return { error: '종료일은 시작일 이후여야 합니다.' };
     }
     const token = await authApi.getGoogleAccessToken();
     const calendarId = await ensureManualCalendarId(
@@ -528,34 +576,65 @@ export const calendarApi = {
       token,
     );
     const batchId = String(Date.now());
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const untilDate = new Date(options.endDate);
+    untilDate.setHours(23, 59, 59, 999);
+    const until = toRruleUntilUtc(untilDate);
 
-    for (const event of events) {
-      await fetchGoogleRequest(
-        `/calendars/${encodeDocId(calendarId)}/events`,
-        token,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            summary: event.title,
-            location: event.location,
-            start: {
-              dateTime: event.startTime.toISOString(),
-              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            },
-            end: {
-              dateTime: event.endTime.toISOString(),
-              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            },
-            extendedProperties: {
-              private: {
-                source: 'timetable-upload',
-                batchId,
+    const requests = events
+      .map((event) => {
+        const byDay = isoWeekdayToRrule(event.weekday);
+        const start = parseHourMinute(event.startTime);
+        const end = parseHourMinute(event.endTime);
+        if (!byDay || !start || !end) return null;
+
+        const firstDate = getFirstOccurrenceDate(options.startDate, event.weekday);
+        if (firstDate.getTime() > options.endDate.getTime()) {
+          return null;
+        }
+
+        const startDateTime = new Date(firstDate);
+        startDateTime.setHours(start.hour, start.minute, 0, 0);
+        const endDateTime = new Date(firstDate);
+        endDateTime.setHours(end.hour, end.minute, 0, 0);
+        if (endDateTime <= startDateTime) {
+          endDateTime.setDate(endDateTime.getDate() + 1);
+        }
+
+        return fetchGoogleRequest(
+          `/calendars/${encodeDocId(calendarId)}/events`,
+          token,
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              summary: event.title,
+              location: event.location,
+              start: {
+                dateTime: startDateTime.toISOString(),
+                timeZone,
               },
-            },
-          }),
-        },
-      );
+              end: {
+                dateTime: endDateTime.toISOString(),
+                timeZone,
+              },
+              recurrence: [`RRULE:FREQ=WEEKLY;BYDAY=${byDay};UNTIL=${until}`],
+              extendedProperties: {
+                private: {
+                  source: 'timetable-upload',
+                  batchId,
+                },
+              },
+            }),
+          },
+        );
+      })
+      .filter((request): request is Promise<unknown> => Boolean(request));
+
+    if (requests.length === 0) {
+      return { error: '유효한 반복 일정이 없습니다.' };
     }
+
+    await Promise.all(requests);
 
     return { data: true };
   },
@@ -569,19 +648,30 @@ export const calendarApi = {
       auth.currentUser.uid,
       token,
     );
-    const data = await fetchGoogle<{
-      items?: Array<{
-        id: string;
-        extendedProperties?: { private?: Record<string, string> };
-      }>;
-    }>(`/calendars/${encodeDocId(calendarId)}/events`, token, {
-      timeMin: start.toISOString(),
-      timeMax: end.toISOString(),
-      singleEvents: 'true',
-      maxResults: '2500',
-    });
+    const items: Array<{
+      id: string;
+      extendedProperties?: { private?: Record<string, string> };
+    }> = [];
+    let pageToken: string | undefined;
+    do {
+      const data = await fetchGoogle<{
+        items?: Array<{
+          id: string;
+          extendedProperties?: { private?: Record<string, string> };
+        }>;
+        nextPageToken?: string;
+      }>(`/calendars/${encodeDocId(calendarId)}/events`, token, {
+        timeMin: start.toISOString(),
+        timeMax: end.toISOString(),
+        singleEvents: 'false',
+        maxResults: '2500',
+        ...(pageToken ? { pageToken } : {}),
+      });
+      items.push(...(data.items ?? []));
+      pageToken = data.nextPageToken;
+    } while (pageToken);
 
-    const deletions = (data.items ?? [])
+    const deletions = items
       .filter(
         (event) =>
           event.extendedProperties?.private?.source === 'timetable-upload',
