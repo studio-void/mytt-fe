@@ -322,13 +322,30 @@ export function MeetingJoinPage() {
     });
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+  const formatDate = (value: string | Date) => {
+    const date = value instanceof Date ? value : new Date(value);
     return date.toLocaleDateString('ko-KR', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     });
+  };
+
+  const isMidnight = (date: Date) =>
+    date.getHours() === 0 &&
+    date.getMinutes() === 0 &&
+    date.getSeconds() === 0 &&
+    date.getMilliseconds() === 0;
+
+  const getEndDateForDisplay = (startTime: string, endTime: string) => {
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    if (!isMidnight(end) || end.getTime() <= start.getTime()) {
+      return end;
+    }
+    const adjusted = new Date(end);
+    adjusted.setDate(adjusted.getDate() - 1);
+    return adjusted;
   };
 
   const meetingRange = useMemo(
@@ -670,7 +687,7 @@ export function MeetingJoinPage() {
               <div className="text-sm text-gray-500">
                 <p>
                   기간: {formatDate(meeting.startTime)} -{' '}
-                  {formatDate(meeting.endTime)}
+                  {formatDate(getEndDateForDisplay(meeting.startTime, meeting.endTime))}
                 </p>
                 <p>시간대: {meeting.timezone}</p>
                 {meeting.groupTitle && (

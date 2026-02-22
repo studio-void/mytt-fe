@@ -336,6 +336,9 @@ export function ShareSchedulePage() {
                   <label className="block text-sm font-medium mb-2">
                     허용된 이메일
                   </label>
+                  <p className="mb-2 text-xs text-gray-500">
+                    내 이메일은 자동으로 허용 목록에 포함됩니다.
+                  </p>
                   <div className="flex gap-2">
                     <input
                       type="email"

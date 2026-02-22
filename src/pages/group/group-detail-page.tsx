@@ -168,6 +168,27 @@ export function GroupDetailPage() {
     }
   };
 
+  const handleDelegateMaster = async (memberId: string, memberLabel: string) => {
+    if (!groupId) return;
+    const confirmed = window.confirm(
+      `${memberLabel}님에게 마스터를 위임할까요? 위임 후 내 역할은 매니저로 변경됩니다.`,
+    );
+    if (!confirmed) return;
+    try {
+      setUpdating(true);
+      await groupApi.delegateMaster(groupId, memberId);
+      toast.success('마스터가 위임되었습니다.');
+      await loadGroup();
+    } catch (error) {
+      console.error('Error delegating master:', error);
+      toast.error(
+        error instanceof Error ? error.message : '마스터 위임에 실패했습니다.',
+      );
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   const handleLeaveGroup = async () => {
     if (!groupId || !user?.uid) return;
     const confirmed = window.confirm('그룹에서 나가시겠어요?');
@@ -239,6 +260,39 @@ export function GroupDetailPage() {
       minute: '2-digit',
       hour12: false,
     });
+
+  const isMidnight = (date: Date) =>
+    date.getHours() === 0 &&
+    date.getMinutes() === 0 &&
+    date.getSeconds() === 0 &&
+    date.getMilliseconds() === 0;
+
+  const isSameDate = (left: Date, right: Date) =>
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate();
+
+  const formatDateOnly = (value: Date) =>
+    value.toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+
+  const formatMeetingRange = (startTime: string, endTime: string) => {
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    if (isMidnight(end) && end.getTime() > start.getTime()) {
+      const endDateForDisplay = new Date(end);
+      endDateForDisplay.setDate(endDateForDisplay.getDate() - 1);
+      const startLabel = formatDateTime(startTime);
+      if (isSameDate(start, endDateForDisplay)) {
+        return `${startLabel} - 24:00`;
+      }
+      return `${startLabel} - ${formatDateOnly(endDateForDisplay)} 24:00`;
+    }
+    return `${formatDateTime(startTime)} - ${formatDateTime(endTime)}`;
+  };
 
   if (loading) {
     return (
@@ -399,8 +453,7 @@ export function GroupDetailPage() {
                     <div>
                       <p className="font-medium">{meeting.title}</p>
                       <p className="text-xs text-gray-500">
-                        {formatDateTime(meeting.startTime)} -{' '}
-                        {formatDateTime(meeting.endTime)}
+                        {formatMeetingRange(meeting.startTime, meeting.endTime)}
                       </p>
                     </div>
                     <Button
@@ -458,6 +511,15 @@ export function GroupDetailPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     {canManageManagers && !isMaster && (
                       <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDelegateMaster(member.uid, label)}
+                          disabled={updating}
+                        >
+                          <Crown />
+                          마스터 위임
+                        </Button>
                         <Button
                           size="sm"
                           variant={

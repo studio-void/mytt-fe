@@ -145,7 +145,7 @@ export const readBucketEvents = async (uid: string, start: Date, end: Date) => {
 
   return events.filter(
     (event) =>
-      event.endTime.toDate() >= start && event.startTime.toDate() <= end,
+      event.endTime.toDate() > start && event.startTime.toDate() < end,
   );
 };
 

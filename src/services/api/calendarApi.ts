@@ -720,7 +720,7 @@ export const calendarApi = {
         startTime: event.startTime.toDate(),
         endTime: event.endTime.toDate(),
       }))
-      .filter((event) => event.endTime >= startDate) as StoredEvent[];
+      .filter((event) => event.endTime > startDate) as StoredEvent[];
     return { data: events };
   },
 

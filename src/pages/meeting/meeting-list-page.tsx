@@ -77,6 +77,39 @@ export function MeetingListPage() {
       hour12: false,
     });
 
+  const isMidnight = (date: Date) =>
+    date.getHours() === 0 &&
+    date.getMinutes() === 0 &&
+    date.getSeconds() === 0 &&
+    date.getMilliseconds() === 0;
+
+  const isSameDate = (left: Date, right: Date) =>
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate();
+
+  const formatDateOnly = (value: Date) =>
+    value.toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+
+  const formatMeetingRange = (startTime: string, endTime: string) => {
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    if (isMidnight(end) && end.getTime() > start.getTime()) {
+      const endDateForDisplay = new Date(end);
+      endDateForDisplay.setDate(endDateForDisplay.getDate() - 1);
+      const startLabel = formatDateTime(startTime);
+      if (isSameDate(start, endDateForDisplay)) {
+        return `${startLabel} - 24:00`;
+      }
+      return `${startLabel} - ${formatDateOnly(endDateForDisplay)} 24:00`;
+    }
+    return `${formatDateTime(startTime)} - ${formatDateTime(endTime)}`;
+  };
+
   const isPastMeeting = (endTime: string) => new Date(endTime) < new Date();
 
   const roleBadge = (role?: GroupRole) => {
@@ -188,8 +221,7 @@ export function MeetingListPage() {
                         <GroupBadgeButton meeting={meeting} />
                       </div>
                       <p className="text-sm text-gray-600">
-                        {formatDateTime(meeting.startTime)} -{' '}
-                        {formatDateTime(meeting.endTime)}
+                        {formatMeetingRange(meeting.startTime, meeting.endTime)}
                       </p>
                       {meeting.timezone && (
                         <p className="text-xs text-gray-400 mt-1">
@@ -280,8 +312,7 @@ export function MeetingListPage() {
                         <GroupBadgeButton meeting={meeting} />
                       </div>
                       <p className="text-sm text-gray-600">
-                        {formatDateTime(meeting.startTime)} -{' '}
-                        {formatDateTime(meeting.endTime)}
+                        {formatMeetingRange(meeting.startTime, meeting.endTime)}
                       </p>
                       {meeting.timezone && (
                         <p className="text-xs text-gray-400 mt-1">

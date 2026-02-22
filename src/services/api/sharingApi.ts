@@ -199,6 +199,19 @@ const ensureUser = () => {
   return auth.currentUser;
 };
 
+const normalizeAllowedEmails = (
+  emails: string[],
+  ownerEmail: string,
+  audience: SharingAudience,
+) => {
+  const normalized = emails.map((email) => normalizeEmail(email)).filter(Boolean);
+  if (audience !== 'restricted') {
+    return Array.from(new Set(normalized));
+  }
+  const withOwner = [...normalized, normalizeEmail(ownerEmail)];
+  return Array.from(new Set(withOwner));
+};
+
 const buildRange = () => {
   const start = addMonths(new Date(), -SHARE_RANGE_MONTHS);
   const end = addMonths(new Date(), SHARE_RANGE_MONTHS);
@@ -392,9 +405,11 @@ export const sharingApi = {
       throw new Error('이미 사용 중인 링크 ID입니다.');
     }
 
-    const normalizedEmails = data.allowedEmails
-      .map((email) => normalizeEmail(email))
-      .filter(Boolean);
+    const normalizedEmails = normalizeAllowedEmails(
+      data.allowedEmails,
+      user.email,
+      data.audience,
+    );
 
     const ownerProfile = await getOwnerProfile(user.uid, user.email);
     const payload: ShareLink = {
@@ -441,9 +456,15 @@ export const sharingApi = {
       throw new Error('수정 권한이 없습니다.');
     }
 
-    const normalizedEmails = data.allowedEmails
-      .map((email) => normalizeEmail(email))
-      .filter(Boolean);
+    if (!user.email) {
+      throw new Error('이메일 정보가 필요합니다.');
+    }
+
+    const normalizedEmails = normalizeAllowedEmails(
+      data.allowedEmails,
+      user.email,
+      data.audience,
+    );
 
     const ownerProfile = await getOwnerProfile(user.uid, user.email);
     await setDoc(
@@ -565,9 +586,12 @@ export const sharingApi = {
 
     if (link.audience === 'restricted') {
       const allowedEmails = (link.allowedEmails ?? []).map(normalizeEmail);
+      const isOwner =
+        auth.currentUser?.uid === link.ownerUid ||
+        normalizedViewerEmail === normalizeEmail(link.ownerEmail);
       if (
-        !normalizedViewerEmail ||
-        !allowedEmails.includes(normalizedViewerEmail)
+        !isOwner &&
+        (!normalizedViewerEmail || !allowedEmails.includes(normalizedViewerEmail))
       ) {
         return { error: 'access_denied', data: null };
       }
@@ -639,7 +663,7 @@ export const sharingApi = {
     const events = Array.from(deduped.values())
       .filter(
         (event) =>
-          event.startTime.toDate() <= end && event.endTime.toDate() >= start,
+          event.startTime.toDate() < end && event.endTime.toDate() > start,
       )
       .sort((left, right) => left.startTime.toMillis() - right.startTime.toMillis())
       .map((event) => mapStoredEventToClient(event));

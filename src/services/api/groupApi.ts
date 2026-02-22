@@ -310,6 +310,39 @@ export const groupApi = {
     return { data: { success: true } };
   },
 
+  delegateMaster: async (groupId: string, targetMemberId: string) => {
+    const user = ensureUser();
+    if (user.uid === targetMemberId) {
+      throw new Error('본인에게는 위임할 수 없습니다.');
+    }
+
+    const groupRef = doc(db, 'groups', groupId);
+    const groupSnap = await getDoc(groupRef);
+    if (!groupSnap.exists()) {
+      throw new Error('그룹을 찾을 수 없습니다.');
+    }
+
+    const group = groupSnap.data() as GroupDoc;
+    if (group.masterUid !== user.uid) {
+      throw new Error('마스터만 위임할 수 있습니다.');
+    }
+
+    const targetMemberRef = doc(db, 'groups', groupId, 'members', targetMemberId);
+    const targetMemberSnap = await getDoc(targetMemberRef);
+    if (!targetMemberSnap.exists()) {
+      throw new Error('위임할 멤버를 찾을 수 없습니다.');
+    }
+
+    const currentMasterRef = doc(db, 'groups', groupId, 'members', user.uid);
+    const batch = writeBatch(db);
+    batch.set(groupRef, { masterUid: targetMemberId, updatedAt: serverTimestamp() }, { merge: true });
+    batch.set(targetMemberRef, { role: 'master', updatedAt: serverTimestamp() }, { merge: true });
+    batch.set(currentMasterRef, { role: 'manager', updatedAt: serverTimestamp() }, { merge: true });
+    await batch.commit();
+
+    return { data: { success: true } };
+  },
+
   removeMember: async (groupId: string, memberId: string) => {
     await deleteDoc(doc(db, 'groups', groupId, 'members', memberId));
     return { data: { success: true } };
